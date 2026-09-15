@@ -1,0 +1,8 @@
+# Unmodified photographic originals: 23 MB of JPEG that nothing on the site
+# loads. Every shipped frame is a grayscale WebP derived from these and
+# committed under design/assets/photos/. Kept locally so a frame can be
+# re-derived at a different size; see design/assets/photos/CREDITS.txt.
+design/_source/
+
+.DS_Store
+node_modules/

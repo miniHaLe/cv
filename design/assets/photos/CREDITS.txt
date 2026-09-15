@@ -1,0 +1,31 @@
+Photography credits. The authoritative list also lives in the <head> of
+landing.html (search "Photography, with thanks"); this file mirrors it and
+adds the provenance chain back to the untouched originals.
+
+Every frame is rendered through filter:grayscale(1), so each ships as a
+grayscale WebP right-sized to the largest box it is ever drawn in — the
+colour was being downloaded and then discarded.
+
+The originals are NOT in this directory. They live in design/_source/
+(repo-root relative; ../../_source/ from here), deliberately outside
+design/assets/ so that deploying the asset tree does not ship 23 MB of
+unused JPEG. Re-derive a frame from there if it is ever needed at a
+different size.
+
+shipped                  from                        author             license         source page
+frame-shelf.webp         design/_source/mkt-01.jpg   Rakoon             CC0             https://commons.wikimedia.org/wiki/File:Detergents-department-ramat-gan-supermarket-october-2015.jpg
+                         Detergents department, Ramat Gan supermarket, 2015
+frame-line.webp          design/_source/kitchen-02.jpg  USDAgov         Public domain   https://commons.wikimedia.org/wiki/File:20120608-OSEC-RBN-2453_(7170162053).jpg
+                         Kitchen line during service. Cropped from 2:3 portrait to 5:4.
+frame-sensors.webp       design/_source/camera-02.jpg   Punit Rajpal    CC0             https://commons.wikimedia.org/wiki/File:CCTV_cameras_in_Mumbai.jpg
+                         CCTV cameras in Mumbai
+frame-rack.webp          design/_source/rack-01.jpg  Thomas Kvistholt   CC0 (Unsplash)  https://commons.wikimedia.org/wiki/File:Beautiful_technology_(Unsplash).jpg
+                         Blade chassis, rear
+frame-city.webp          design/_source/saigon-01.jpg   lumoplank       CC0             https://commons.wikimedia.org/wiki/File:Ho_Chi_Minh_City_-_Saigon1324.jpg
+                         Ho Chi Minh City at night from the Saigon river
+portrait.webp            (no _source entry)          Le Nguyen Thanh Ha own photograph  supplied by the subject
+                         Cropped to 4:5, desaturated, grayscale WebP. All rights reserved.
+
+All photographic sources are CC0 or public domain: no attribution is
+required, and none appears on the page. This file and the <head> note are
+the credit regardless.

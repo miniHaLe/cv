@@ -1,0 +1,256 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-15T00:00:00Z",
+  "title": "Design System: Le Nguyen Thanh Ha — AI Product Engineer",
+  "extensions": {
+    "colorMeta": {
+      "ground": {
+        "role": "neutral",
+        "displayName": "Cold Near-Black",
+        "canonical": "#0b0d10",
+        "tonalRamp": [
+          "#0b0d10",
+          "#12161b",
+          "#171c23",
+          "#242c36",
+          "#566981"
+        ]
+      },
+      "bone": {
+        "role": "neutral",
+        "displayName": "Warm Bone",
+        "canonical": "#f0e9df",
+        "tonalRamp": [
+          "#f0e9df",
+          "#98a1ac",
+          "#7c8794"
+        ]
+      },
+      "signal-red": {
+        "role": "primary",
+        "displayName": "Signal Red",
+        "canonical": "#ff2f43",
+        "tonalRamp": [
+          "#ff5566",
+          "#ff2f43",
+          "#f0243a",
+          "#c30a1c",
+          "#a4121f"
+        ]
+      },
+      "ground-light": {
+        "role": "neutral",
+        "displayName": "Warm Paper",
+        "canonical": "#f0ece4",
+        "tonalRamp": [
+          "#fffdf9",
+          "#f0ece4",
+          "#e7e1d5",
+          "#aca291",
+          "#877f72"
+        ]
+      },
+      "print": {
+        "role": "neutral",
+        "displayName": "Paper",
+        "canonical": "#ffffff",
+        "tonalRamp": [
+          "#ffffff",
+          "#c9c4ba",
+          "#8a8378",
+          "#55595f",
+          "#3a3e45",
+          "#16171b"
+        ]
+      },
+      "signal-red-print": {
+        "role": "primary",
+        "displayName": "Signal Red (Paper)",
+        "canonical": "#a4121f",
+        "tonalRamp": [
+          "#a4121f"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Four or five headline moments. Uppercase, condensed, authored line breaks inside clipping wrappers."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Serif reading copy. Measure 56–62ch."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Monospace metadata, eyebrows, chips, instrument readout. Uppercase in Latin locales only."
+      }
+    },
+    "shadows": [
+      {
+        "name": "lift",
+        "value": "0 26px 60px -24px rgba(0,0,0,.6)",
+        "purpose": "The only shadow in the system. Hover and focus on a work card, always alongside the inset highlight."
+      },
+      {
+        "name": "lift-light",
+        "value": "0 26px 60px -24px rgba(0,0,0,.22)",
+        "purpose": "Same role in the light theme, where 60% black is too heavy on cream."
+      },
+      {
+        "name": "inset-highlight",
+        "value": "inset 0 1px 0 rgba(255,255,255,.055)",
+        "purpose": "The lit top edge that gives a surface material. Light theme uses rgba(255,255,255,.85)."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-out",
+        "value": "cubic-bezier(.2,.9,.3,1)",
+        "purpose": "The signature curve. Every state change and entrance. Do not introduce a second ease-out."
+      },
+      {
+        "name": "ease-acquire",
+        "value": "cubic-bezier(.16,1,.3,1)",
+        "purpose": "One-shot acquisition: the bracket closing on a target."
+      },
+      {
+        "name": "duration-state",
+        "value": "200ms",
+        "purpose": "Colour and border feedback."
+      },
+      {
+        "name": "duration-surface",
+        "value": "400ms",
+        "purpose": "Panel entrance and exit."
+      },
+      {
+        "name": "duration-acquire",
+        "value": "500ms",
+        "purpose": "Bracket lock."
+      },
+      {
+        "name": "duration-reduced",
+        "value": "120ms",
+        "purpose": "Everything that survives prefers-reduced-motion: colour, border, outline, opacity, visibility."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "narrow",
+        "value": "400px"
+      },
+      {
+        "name": "phone",
+        "value": "560px"
+      },
+      {
+        "name": "tablet",
+        "value": "860px"
+      },
+      {
+        "name": "chrome-compact",
+        "value": "980px"
+      },
+      {
+        "name": "desktop",
+        "value": "1000px"
+      },
+      {
+        "name": "pin-gate",
+        "value": "1001px x 840px"
+      },
+      {
+        "name": "wrap-max",
+        "value": "1280px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "One per view. Signal red fill, ground ink, full pill.",
+      "html": "<a class=\"ds-btn\" href=\"#\"><span>See the work</span></a>",
+      "css": ".ds-btn{display:inline-flex;align-items:center;gap:10px;min-height:52px;padding:0 28px;border-radius:999px;font-family:'JetBrains Mono',monospace;font-size:.75rem;letter-spacing:.15em;text-transform:uppercase;text-decoration:none;border:1px solid #ff2f43;background:#ff2f43;color:#0b0d10;transition:background .2s cubic-bezier(.2,.9,.3,1),border-color .2s cubic-bezier(.2,.9,.3,1)}.ds-btn:hover{background:color-mix(in srgb,#ff2f43 88%,#f0e9df);border-color:color-mix(in srgb,#ff2f43 88%,#f0e9df)}.ds-btn:active{transform:scale(.96)}"
+    },
+    {
+      "name": "Work Card",
+      "kind": "card",
+      "refersTo": "card-work",
+      "description": "Schematic, claim, tags, verifiable figure, route to check it.",
+      "html": "<article class=\"ds-card\"><div class=\"ds-who\">Viettel Solutions · 2023–25</div><h3>TesselAI</h3><p>Computer vision that scores market photographs automatically.</p><div class=\"ds-out\"><strong>120</strong> RPS at TP95</div></article>",
+      "css": ".ds-card{background:#12161b;border:1px solid #566981;border-radius:18px;padding:32px 30px 28px;box-shadow:inset 0 1px 0 rgba(255,255,255,.055);color:#98a1ac;font-family:'Source Serif 4',Georgia,serif;transition:border-color .3s cubic-bezier(.2,.9,.3,1),background .3s cubic-bezier(.2,.9,.3,1)}.ds-card:hover{border-color:#ff2f43;background:#171c23;box-shadow:inset 0 1px 0 rgba(255,255,255,.055),0 26px 60px -24px rgba(0,0,0,.6)}.ds-who{font-family:'JetBrains Mono',monospace;font-size:.75rem;letter-spacing:.13em;text-transform:uppercase;color:#ff2f43;margin-bottom:22px}.ds-card h3{font-family:'Bricolage Grotesque',Arial,sans-serif;font-weight:700;font-size:1.875rem;line-height:1.02;letter-spacing:-.03em;text-transform:uppercase;color:#f0e9df;margin:0 0 16px}.ds-out{margin-top:24px;padding-top:18px;border-top:1px solid #242c36;font-family:'JetBrains Mono',monospace;font-size:.75rem}.ds-out strong{font-family:'Bricolage Grotesque',Arial,sans-serif;font-weight:800;font-size:1.625rem;color:#ff2f43;letter-spacing:-.035em;font-variant-numeric:tabular-nums}"
+    },
+    {
+      "name": "Reel Step",
+      "kind": "nav",
+      "refersTo": "step-indicator",
+      "description": "Numbered jump target under the pinned card rail. Accessible name comes from its card's heading.",
+      "html": "<nav class=\"ds-steps\"><button class=\"ds-st\" aria-current=\"true\">01</button><button class=\"ds-st\">02</button></nav>",
+      "css": ".ds-steps{display:flex;gap:6px}.ds-st{width:34px;min-height:34px;display:grid;place-items:center;border-radius:9px;background:transparent;border:1px solid #242c36;font-family:'JetBrains Mono',monospace;font-size:.75rem;color:#7c8794;font-variant-numeric:tabular-nums;cursor:pointer;transition:color .2s cubic-bezier(.2,.9,.3,1),border-color .2s cubic-bezier(.2,.9,.3,1),background .2s cubic-bezier(.2,.9,.3,1)}.ds-st:hover{color:#f0e9df;border-color:#566981}.ds-st[aria-current=\"true\"]{background:#ff2f43;border-color:#ff2f43;color:#0b0d10}"
+    },
+    {
+      "name": "Acquisition Bracket",
+      "kind": "custom",
+      "description": "The system's single motif. Four L-corners at a fixed 17px, drawn around any target regardless of its size.",
+      "html": "<div class=\"ds-acq\"><i class=\"c1\"></i><i class=\"c2\"></i><i class=\"c3\"></i><i class=\"c4\"></i></div>",
+      "css": ".ds-acq{position:relative;width:200px;height:90px}.ds-acq i{position:absolute;width:17px;height:17px;border:2px solid #ff2f43}.ds-acq .c1{top:0;left:0;border-right:0;border-bottom:0}.ds-acq .c2{top:0;right:0;border-left:0;border-bottom:0}.ds-acq .c3{bottom:0;left:0;border-right:0;border-top:0}.ds-acq .c4{bottom:0;right:0;border-left:0;border-top:0}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Field Instrument",
+    "overview": "The page is built as a piece of detection equipment rather than as a portfolio. Its subject builds computer-vision systems that watch a room and report what they saw, and the interface performs that same job on itself: a reticle tracks the cursor, a canvas acquires ambient targets behind the headline, a fixed instrument locks onto whichever section you have reached, and brackets close around the heading you jump to. The bracket is the single motif and it appears at every scale.\n\nThe ground is a cold near-black lit by one warm aubergine bloom, with warm cream text that is never pure white and a single signal red used sparingly enough that it always means look here. A 22px dot lattice and a fine grain sit under everything, so the background reads as a sensor surface rather than as a void.\n\nThe confirmed anti-reference is the AI-SaaS marketing page: gradient text, glass panels, pastel abstractions, icon-heading-paragraph card grids, and stock illustration of AI. Every claim is attached to a number and a route to verify it.",
+    "keyCharacteristics": [
+      "One motif — the acquisition bracket — carried through eight surfaces",
+      "Cold ground, warm ink, one signal colour",
+      "Instrumentation over decoration: labels are monospace and measured, prose is serif",
+      "Evidence typography: every figure tabular, every claim ending in a checkable number",
+      "Four locales as a first-class constraint, not a retrofit"
+    ],
+    "rules": [
+      {
+        "name": "The One Signal Rule",
+        "body": "Red marks exactly one thing per view: the action, the current position, or the figure being claimed. When two elements both want it, one of them is wrong about its importance.",
+        "section": "colors"
+      },
+      {
+        "name": "The Warm Ink Rule",
+        "body": "No pure white and no pure black as ink. The only pure values in the system are the image outline and the inset highlight, where a tinted neutral would read as dirt on a photograph.",
+        "section": "colors"
+      },
+      {
+        "name": "The Two Unit Rule",
+        "body": "Text sizes are rem so the page answers the reader's own browser font size. Display type stays px + vw because those lines are authored to break on specific words and live inside overflow:hidden.",
+        "section": "typography"
+      },
+      {
+        "name": "The Short Caps Rule",
+        "body": "Uppercase is for labels, never for sentences. Keys are uppercase; their values are not. Removed entirely under :lang(ja) and :lang(zh).",
+        "section": "typography"
+      },
+      {
+        "name": "The Lit Edge Rule",
+        "body": "A surface reads as material because of an inset top highlight, not a drop shadow. Any rule setting box-shadow on a card must re-state the inset.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do attach every claim to a number and a route to check it.",
+      "Do re-state the inset highlight in any rule that sets box-shadow on a card.",
+      "Do use rem for anything a reader reads and px + vw for authored display lines.",
+      "Do gate pointer-driven depth behind (hover:hover) and (pointer:fine).",
+      "Do keep uppercase to labels, and remove it entirely under :lang(ja) and :lang(zh).",
+      "Do name any new curve against --ease-out rather than introducing a second ease-out."
+    ],
+    "donts": [
+      "Don't put body copy on the signal red, or use red for two meanings on one screen.",
+      "Don't use pure white or pure black as ink.",
+      "Don't add a tinted border to a photograph; use outline with --img-outline.",
+      "Don't add a string without adding it to all three dictionaries and running design/i18n/sync.py.",
+      "Don't animate a layout property, and don't let decorative animation survive prefers-reduced-motion — but do keep opacity and visibility transitions.",
+      "Don't introduce a third-party origin on the critical path."
+    ]
+  }
+}

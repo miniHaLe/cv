@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<title>Le Nguyen Thanh Ha — CV</title>
+<style>
+  @page { size: A4; margin: 11mm 12mm; }
+  :root{ --ink:#15161a; --muted:#5c6068; --accent:#8c1d2f; --gold:#a8802b;
+         --rule:#d9d5ce; --panel:#f7f4ef; }
+  *{ box-sizing:border-box; }
+  body{ margin:0; font-family:"Helvetica Neue",Helvetica,Arial,sans-serif; color:var(--ink);
+        font-size:9.6pt; line-height:1.3; -webkit-font-smoothing:antialiased; }
+  h1{ font-size:18pt; letter-spacing:-.015em; margin:0 0 3px; font-weight:700; }
+  .pitch{ font-size:10.5pt; color:var(--accent); font-weight:600; margin-bottom:6px; text-wrap:balance; }
+  .contact{ font-size:9pt; color:var(--muted); }
+  .contact span{ white-space:nowrap; }
+  .contact i{ color:var(--rule); font-style:normal; margin:0 2px; }
+  /* A machine-room texture behind the name, kept at watermark strength: it is
+     the only decoration on the page, and at 7% it survives a colour printer as
+     a faint screen tint and a mono one as nothing at all. print-color-adjust is
+     what stops the browser dropping it under "background graphics off". */
+  header{ position:relative; border-bottom:2px solid var(--accent);
+          padding:8px 0 6px; margin:0 0 8px; overflow:hidden;
+          -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  /* The 9% tint and the left-to-right fade are baked into the file, not applied
+     here. A CSS mask or filter over this layer forces the print pipeline to
+     rasterise the whole band, which cost 209 KB on a 270 KB PDF; as a plain
+     background the same picture rides along as an 11 KB JPEG. */
+  header::before{ content:""; position:absolute; inset:0; z-index:0;
+    background:url("design/assets/photos/cv-mesh.jpg") 50% 20% / cover no-repeat;
+    -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  header > *{ position:relative; z-index:1; }
+  h2{ font-size:9.5pt; text-transform:uppercase; letter-spacing:.14em; color:var(--accent);
+      margin:8px 0 4px; padding-bottom:3px; border-bottom:1px solid var(--rule); font-weight:700;
+      break-after:avoid; page-break-after:avoid; }
+  section:first-of-type h2{ margin-top:0; }
+  h3{ font-size:10pt; margin:6px 0 3px; font-weight:700; break-after:avoid; page-break-after:avoid; }
+  p{ margin:0 0 5px; }
+  .lede{ text-align:left; }
+
+  /* headline metrics strip */
+  .metrics{ display:flex; gap:0; margin:5px 0 6px; border-top:1px solid var(--rule);
+            border-bottom:1px solid var(--rule); }
+  .metric{ flex:1; padding:6px 8px 5px; border-right:1px solid var(--rule); }
+  .metric:last-child{ border-right:none; }
+  .metric b{ display:block; font-size:12pt; color:var(--accent); line-height:1.1; letter-spacing:-.02em; }
+  .metric span{ display:block; font-size:8pt; color:var(--muted); text-transform:uppercase;
+                letter-spacing:.07em; margin-top:2px; }
+
+  table{ width:100%; border-collapse:collapse; margin:4px 0 2px; font-size:9.2pt; }
+  th{ text-align:left; font-size:8pt; text-transform:uppercase; letter-spacing:.09em;
+      color:var(--muted); font-weight:600; padding:0 8px 3px 0; border-bottom:1px solid var(--rule); }
+  td{ padding:3px 8px 3px 0; border-bottom:1px solid #eae6df; vertical-align:top; }
+  td:first-child{ font-weight:600; width:27%; }
+  td:last-child{ color:var(--muted); width:26%; padding-right:0; }
+  table.engage td:first-child{ width:24%; }
+  table.engage td:last-child{ color:var(--ink); width:auto; }
+
+  /* two-column "where I would start" block: finance left, AI right */
+  .cols{ display:flex; gap:16px; }
+  .cols > div{ flex:1; }
+  .cols ul{ padding-left:12px; }
+
+  .job{ margin-bottom:6px; }
+  .jobhead{ display:flex; justify-content:space-between; align-items:baseline; gap:10px;
+            break-after:avoid; page-break-after:avoid; }
+  .jobtitle{ font-weight:700; font-size:10.5pt; }
+  .jobtitle em{ font-style:normal; font-weight:500; color:var(--muted); }
+  .dates{ font-size:9pt; color:var(--muted); white-space:nowrap; font-variant-numeric:tabular-nums; }
+  .note{ font-size:9.5pt; color:var(--muted); margin:2px 0 5px; }
+  .sub{ font-size:10pt; font-style:italic; color:var(--accent); margin:5px 0 3px;
+        break-after:avoid; page-break-after:avoid; }
+  ul{ margin:0; padding-left:12px; }
+  li{ margin-bottom:1.5px; }
+  li::marker{ color:var(--gold); }
+
+  .gov{ background:var(--panel); border-left:2.5px solid var(--gold); padding:6px 10px 6px 22px;
+        margin:0; font-size:9.3pt; }
+  .gov li{ margin-bottom:2.5px; }
+  .caps li{ list-style:none; margin-left:-12px; margin-bottom:1.5px; }
+  .caps b{ color:var(--accent); }
+  .verify{ background:var(--panel); border-left:2.5px solid var(--accent); padding:6px 9px;
+           font-size:9.5pt; }
+  .method{ background:var(--panel); border-left:2.5px solid var(--gold); padding:6px 9px;
+           font-size:9.5pt; margin-top:5px; }
+  strong{ font-weight:700; }
+  @media print {
+    a{ color:inherit; text-decoration:none; }
+    /* On paper the watermark runs to the trimmed edge rather than stopping at
+       the text column, which is what keeps it reading as stock and not as a
+       grey box behind the name. On screen there is no page margin to bleed
+       into, so the same rule would just push a scrollbar onto the document. */
+    header{ margin-inline:-12mm; padding-inline:12mm; }
+  }
+</style></head><body>
+
+<header>
+  <h1>Le Nguyen Thanh Ha</h1>
+  <div class="pitch">AI Product Engineer &mdash; I take an operational problem from business case to a system in production, and I own every layer in between. Alone when the scope allows it; leading the team when it does not.</div>
+  <div class="contact">
+    <span>+84 396 913 492</span> <i>&bull;</i> <span>thanhha.le@outlook.com</span> <i>&bull;</i>
+    <span>linkedin.com/in/hale03</span> <i>&bull;</i> <span>github.com/miniHaLe</span> <i>&bull;</i>
+    <span>Ho Chi Minh City &mdash; available for Hanoi relocation or remote</span>
+  </div>
+</header>
+
+<section>
+  <h2>Executive Summary</h2>
+  <p class="lede">Twelve AI and business systems in production across retail, hospitality, gaming, logistics and finance operations. <strong>Six of them I delivered end to end on my own</strong> &mdash; requirements, architecture, model, backend, interface, security review, deployment and handover. The other six I built as primary author inside product teams, including the flagship platform of my current company.</p>
+  <p class="lede">What distinguishes the work is not the models. It is that every system was built to be <strong>audited, operated and extended by people other than me</strong>: phased delivery with written completion criteria and sign-off gates, human confirmation before automated output is treated as fact, role-based access enforced structurally, dead-letter queues so no failure is silent, and rollback on every release. That is the discipline a finance function expects and an AI function rarely gets.</p>
+
+  <div class="metrics">
+    <div class="metric"><b>12</b><span>Production systems</span></div>
+    <div class="metric"><b>6</b><span>Delivered solo, end to end</span></div>
+    <div class="metric"><b>~3&times;</b><span>Throughput, same GPU spend</span></div>
+    <div class="metric"><b>101</b><span>Security findings closed</span></div>
+    <div class="metric"><b>4</b><span>Languages at launch</span></div>
+  </div>
+
+  <table>
+    <tr><th>What I delivered</th><th>Business outcome</th><th>Verifiable evidence</th></tr>
+    <tr><td>TesselAI retail image scoring &mdash; Viettel Solutions</td><td>Manual field-audit review replaced by automated scoring across the retail footprint</td><td>Business case authored &rarr; built &rarr; released; ~3&times; throughput gain</td></tr>
+    <tr><td>Sauron restaurant AI platform &mdash; DFlo</td><td>Live operations visibility replacing manual floor checks; automated food quality control</td><td>Primary author, six services, 399 commits</td></tr>
+    <tr><td>Financial analytics platform &mdash; independent contract</td><td>Inconsistent finance, KPI and HR workbooks reconciled into governed, traceable dashboards</td><td>11 phases with written completion criteria; 101 security findings closed</td></tr>
+    <tr><td>Multi-branch operations platform &mdash; independent contract</td><td>Spreadsheet operations of a repair chain replaced by one system with branch-level data isolation</td><td>21 business resources live; isolation enforced in the access token</td></tr>
+    <tr><td>Casino floor intelligence &mdash; Rainscales</td><td>Customer and staff detection under camera placements that had defeated earlier attempts</td><td>95% mAP at ~25 FPS on one GPU</td></tr>
+  </table>
+</section>
+
+<section>
+  <h2>Where I Would Start at Vingroup</h2>
+  <p class="lede">I do not know your internal systems. I do know which of my delivered systems map onto the problems a group finance function and a group AI function carry, and I would rather show working code than a slide.</p>
+  <div class="cols">
+    <div>
+      <h3>For the finance function</h3>
+      <ul>
+        <li><strong>Subsidiary reporting consolidation.</strong> My financial analytics platform already takes inconsistent workbooks from different sources, proposes how they relate, waits for a human to confirm, and produces traceable dashboards. That is the shape of group-level consolidation across operating companies &mdash; with the audit trail built in.</li>
+        <li><strong>Governed AI, not black-box AI.</strong> Every number traces to a source cell and a confirmed mapping. Accuracy gates refuse to report a pass on synthetic data. This is a control posture an internal-audit or CFO office can sign off on.</li>
+        <li><strong>Document and meeting intelligence.</strong> Transcription, summary, PDF/XLSX reporting and a searchable cross-meeting knowledge base, deployed on Azure with infrastructure-as-code &mdash; already in production for a distribution-centre client.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>For the AI function</h3>
+      <ul>
+        <li><strong>Computer vision that survives the real site.</strong> Retail shelf scoring, restaurant floor and kitchen monitoring, casino floor detection under bad angles, warehouse rack analysis &mdash; four industries, all in production. The same stack applies to retail tenants, hospitality properties, manufacturing and logistics sites, and residential security estates.</li>
+        <li><strong>Natural-language search over a CCTV estate.</strong> Managers describe an incident and get the exact clip. Built for a 100-camera network and for a restaurant chain.</li>
+        <li><strong>LLM agents with guardrails over operational data.</strong> Non-technical managers ask in plain language; the agent answers from history with constraints on what it may assert.</li>
+        <li><strong>GPU cost at scale.</strong> ~3&times; throughput on the same hardware, and 30 &rarr; 5 FPS detection cadence at no visible quality loss. At group scale, that is the difference between a cost line and a capital request.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>How I Lead Delivery</h2>
+  <p class="lede">I have led projects, not headcount &mdash; and I am ready to do both. The evidence:</p>
+  <ul>
+    <li><strong>I own the business case, not just the build.</strong> At Viettel Solutions I identified the opportunity, wrote the proposal, and aligned business and field-operations teams on measurable acceptance criteria before a model was trained &mdash; so "correct" was defined by the business, not by the engineer.</li>
+    <li><strong>I run engagements as phases with sign-off gates.</strong> Six independent contracts delivered under written completion criteria per phase, client confirmation at each gate, and a handover that let non-technical staff operate and recover the system without me. An 11-phase financial platform was delivered this way with zero scope disputes.</li>
+    <li><strong>I set the engineering standard others inherit.</strong> Primary author of a six-service platform now maintained by a team: CI/CD with automatic rollback, documented architecture, unit-tested calculation modules, and a four-language interface shipped on day one.</li>
+    <li><strong>I have shipped inside teams as well as alone.</strong> Building-wide CCTV retrieval delivered in a team of five; products at DFlo, Rainscales and Viettel delivered alongside product, business and operations colleagues.</li>
+  </ul>
+  <p class="method"><strong>How I would run a team at Vingroup:</strong> one accountable owner per service, tracer-bullet delivery (thin end-to-end slices before depth), a weekly working demo to the business sponsor, written completion criteria per phase, and a handover package as a deliverable rather than an afterthought. It is the method I already apply to myself.</p>
+</section>
+
+<section>
+  <h2>Ways to Engage</h2>
+  <table class="engage">
+    <tr><th>Model</th><th>What it looks like</th></tr>
+    <tr><td>Full-time employee</td><td>AI product or platform engineer, or technical lead of a small delivery team. Hanoi relocation or remote.</td></tr>
+    <tr><td>Fixed-scope project contract</td><td>A defined outcome delivered in phases with written completion criteria, sign-off at each gate, and full handover. This is how all six independent systems were delivered.</td></tr>
+    <tr><td>Embedded technical lead</td><td>Stand up or unblock an internal team on a specific system, transfer the method and the code, then step back.</td></tr>
+  </table>
+  <p class="note">Available immediately. Private repositories can be opened for technical review under a mutual NDA.</p>
+</section>
+
+<section>
+  <h2>Professional Experience</h2>
+
+  <div class="job">
+    <div class="jobhead"><div class="jobtitle">AI Engineer <em>&mdash; DFlo</em></div><div class="dates">Jul 2025 &ndash; Present</div></div>
+    <p class="note">Primary author and technical owner of <em>Sauron</em>, the company's flagship AI platform for restaurant operations, plus three further client-facing AI products.</p>
+    <ul>
+      <li><strong>Turned a manual floor-check process into a live operations view.</strong> Architected a six-service platform (API gateway, computer-vision engine, food quality control, analytics agent, dashboard, and a Postgres/MongoDB/Redis data layer) delivering real-time table occupancy, movement heatmaps, automated food quality scoring, and conversational reporting in a single product &mdash; <strong>399 commits, primary author</strong>.</li>
+      <li><strong>Removed manual quality sampling from the kitchen line.</strong> Designed an automated food quality-control pipeline on a vision-language model: classification across 24 dish variants, asymmetric scoring, server-side automatic capture. Engineered for accountability &mdash; <strong>circuit breakers, a dead-letter queue so no evaluation is silently lost</strong>, and streamed diagnostics so operators see <em>why</em> a dish failed.</li>
+      <li><strong>Restored a fully failed production line and closed the gap permanently.</strong> Diagnosed a 100% quality-control failure caused by configuration values silently not reaching the vision model, fixed the root cause across all three consumers of that configuration, and rebuilt the retry path so exhausted retries always reach the dead-letter queue with a diagnosable reason.</li>
+      <li><strong>Unlocked multi-user operation.</strong> Built a session-isolation layer giving each operator an independent camera session &mdash; the change that took the platform from single-operator demo to concurrent commercial use.</li>
+      <li><strong>Made operations data self-serve for non-technical managers.</strong> Shipped natural-language video moment retrieval (describe the moment, get the clip) and an LLM analytics agent with guardrails and conversation memory over historical operations data.</li>
+      <li><strong>Delivered in four markets from day one.</strong> Owned the customer-facing dashboard end to end with <strong>full EN / VI / JA / ZH localisation</strong>, accessibility remediation, and analytics panels backed by unit-tested calculation modules.</li>
+      <li><strong>Cut infrastructure cost without degrading the product.</strong> Reduced GPU detection cadence 30 &rarr; 5 FPS using tracker interpolation; automated releases with <strong>CI/CD and automatic rollback</strong>.</li>
+    </ul>
+    <div class="sub">Additional products delivered at DFlo</div>
+    <ul>
+      <li><strong>Conveyor-belt dish counting for KichiKichi (Golden Gate Group)</strong> &mdash; production computer-vision system counting dishes by category through every stage of the belt across dual cameras, with live dashboards for store managers. Cut the API surface from 30+ endpoints to 13.</li>
+      <li><strong>Enterprise video intelligence platform</strong> &mdash; extended a research retrieval system into a production service handling <strong>video libraries of 24+ hours</strong>, with vector search, batch processing and session caching.</li>
+      <li><strong>Meeting intelligence for a distribution-centre client</strong> &mdash; recording through transcription, AI summary, PDF/XLSX reporting and a searchable cross-meeting knowledge base; deployed to <strong>Microsoft Azure with infrastructure-as-code</strong>.</li>
+    </ul>
+  </div>
+
+  <div class="job">
+    <div class="jobhead"><div class="jobtitle">Independent Delivery Practice <em>&mdash; fixed-scope contracts</em></div><div class="dates">Nov 2024 &ndash; Aug 2026</div></div>
+    <p class="note">Six production business systems delivered solo under fixed-scope contracts &mdash; requirements, architecture, build, security review, deployment and handover documentation. Clients were Vietnamese SMEs with no in-house IT function, so every system had to be operable and recoverable by non-technical staff.</p>
+    <ul>
+      <li><strong>Financial analytics platform &mdash; built for people who do not trust a black box.</strong> Clients upload inconsistent financial, KPI and HR workbooks; the platform reconciles them into structured tables, <strong>proposes how the files relate and waits for a human to confirm before anything is treated as fact</strong>, and produces editable dashboards. Delivered across <strong>11 phases with documented completion criteria</strong>; three remediation releases closed <strong>101 distinct security findings</strong>, and a manual security review was completed and signed off. Accuracy gates are enforced mechanically &mdash; the test harness <em>refuses to report a pass</em> on synthetic data.</li>
+      <li><strong>Multi-branch operations platform for an appliance-repair chain</strong> &mdash; replaced spreadsheet operations with a single system covering <strong>21 business resources</strong>. Access control is structural: <strong>branch-level data segregation enforced in the access token itself</strong>, sensitive actions permission-guarded, confidential fields stripped before data leaves the server. Migrated the production host and automated database and API releases so the client's releases stopped depending on my availability.</li>
+      <li><strong>Content and tax-agency systems</strong> <em>(3 clients)</em> &mdash; one built deliberately in <strong>zero-dependency Node.js</strong> so the client can run, patch and back up the system indefinitely without a build toolchain or vendor lock-in; rate limiting, forced credential setup on first use, automated search-engine indexing.</li>
+      <li><strong>Commercial websites with real administrative back-ends</strong> <em>(3 clients)</em> &mdash; content management, file handling, scripted deployment, handed over with operating documentation.</li>
+    </ul>
+  </div>
+
+  <div class="job">
+    <div class="jobhead"><div class="jobtitle">AI Engineer <em>&mdash; Rainscales (Contract)</em></div><div class="dates">Feb 2025 &ndash; Jun 2025</div></div>
+    <ul>
+      <li>Delivered customer and staff detection with multi-camera counting for a casino client under difficult physical camera placement &mdash; the constraint that had blocked earlier attempts &mdash; at <strong>95% mAP and ~25 FPS on a single GPU</strong>, meeting the client's real-time threshold.</li>
+      <li>Built behavioural recognition (hand-raising, head-turning) so floor staff are directed to guests who need help, without additional headcount.</li>
+      <li>Produced warehouse layout placement rules for Linfox from depth-estimation and rack-detection analysis, converting camera output into an operational decision.</li>
+    </ul>
+  </div>
+
+  <div class="job">
+    <div class="jobhead"><div class="jobtitle">AI Engineer <em>&mdash; Viettel Solutions</em></div><div class="dates">Jun 2023 &ndash; Jan 2025</div></div>
+    <div class="sub">TesselAI &mdash; from internal proposal to a commercial product in production</div>
+    <ul>
+      <li><strong>Identified the opportunity, wrote the business case, then built and released the product</strong> &mdash; automated market image scoring using computer vision, adopted commercially and replacing manual field-audit review across the retail footprint.</li>
+      <li><strong>Delivered ~3&times; throughput on unchanged hardware</strong> by re-engineering the inference path &mdash; 120 requests per second at TP95 latency with no loss of accuracy. Capacity gained without capital expenditure.</li>
+      <li>Trained and deployed the detection and segmentation models running in the production scoring pipeline.</li>
+      <li>Worked directly with business and field-operations teams to convert audit rules into measurable, testable acceptance criteria.</li>
+    </ul>
+  </div>
+</section>
+
+<section>
+  <h2>Governance, Security &amp; Delivery Discipline</h2>
+  <ul class="gov">
+    <li><strong>Human confirmation before trust.</strong> No inferred relationship between client workbooks is acted on until a person confirms it. Automation proposes; a human approves.</li>
+    <li><strong>Remediation with evidence.</strong> 101 security findings identified and closed across three releases, plus a completed manual security review with outstanding items explicitly recorded rather than quietly dropped.</li>
+    <li><strong>Access control by design.</strong> Branch-scoped data isolation enforced at the token level, role-based permissions on sensitive actions, least-privilege data projections.</li>
+    <li><strong>No silent failure.</strong> Dead-letter queues and diagnostic error reporting, so a failed automated evaluation is always visible and recoverable.</li>
+    <li><strong>Reversible releases.</strong> Continuous delivery with automatic rollback; deployment documented as runbooks so the client never depends on one individual.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>Technical Skills</h2>
+  <ul class="caps">
+    <li><b>Artificial Intelligence</b> &mdash; computer vision (YOLO11/YOLOX, OpenCV, person re-identification and tracking), vision-language models (Gemini), LLM agents with guardrails (Agno, LangChain), retrieval-augmented generation, speech recognition, PyTorch, TensorFlow, ONNX, Triton</li>
+    <li><b>Backend &amp; Data</b> &mdash; Python (FastAPI, Celery, Flask), TypeScript (NestJS, Express), PostgreSQL, MongoDB, Redis, vector databases, PySpark, Pandas, Power BI</li>
+    <li><b>Frontend</b> &mdash; Next.js, React, TypeScript, Tailwind, multi-locale product delivery (EN/VI/JA/ZH), automated testing</li>
+    <li><b>Cloud &amp; Operations</b> &mdash; Google Cloud, Microsoft Azure (Container Apps, infrastructure-as-code), Docker, CI/CD with automated rollback, self-hosted runners, secure reverse proxy and tunnel access</li>
+    <li><b>Programming Languages</b> &mdash; Python &middot; TypeScript / JavaScript &middot; SQL &middot; Go &middot; Bash</li>
+    <li><b>Languages</b> &mdash; Vietnamese (native) &middot; English (professional working proficiency)</li>
+  </ul>
+</section>
+
+<section>
+  <h2>Selected Projects &amp; Open Source</h2>
+  <ul>
+    <li><strong>Building-wide CCTV action retrieval</strong> <em>(team of 5)</em> &mdash; natural-language video search across a 100-camera network so security teams find incidents in seconds instead of hours.</li>
+    <li><strong>Open-source contributor, PyTorch AnimeGAN</strong> <em>(188+ stars)</em> &mdash; improved training stability and added multi-GPU support to a widely used image-generation project.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>Verification</h2>
+  <p class="verify">Engineering claims are independently checkable at <strong>github.com/miniHaLe</strong> &mdash; 797 commits across 75 peer-reviewed pull requests. Commercial repositories are private; read access under a mutual NDA within two business days.</p>
+</section>
+
+</body></html>
