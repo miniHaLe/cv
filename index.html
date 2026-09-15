@@ -496,21 +496,58 @@ h2 .hl{color:var(--accent)}
   font-size:0.75rem; letter-spacing:.13em; text-transform:uppercase;
   color:var(--muted); margin-top:18px; line-height:1.7}
 
-/* ══ pinned horizontal reel ══════════════════════════════════════════════ */
-/* Only the rail is pinned. Pinning the whole section meant the head's 124px of
-   padding sat inside the pinned box, pushing the card 1320px tall into an 809px
-   viewport: every card lost its outcome figure and its CTA below the fold. */
-#reel{overflow:hidden; padding:36px 0 44px; position:relative}
+/* ══ work reel ═══════════════════════════════════════════════════════════
+   A real horizontal scroller, not a scroll hijack.
+
+   This was a pinned GSAP scrub that drove the rail's x from the page's
+   scrollY. Measured, that ignored every gesture a mouse owns: a horizontal
+   wheel moved it 0px, a 600px click-drag moved it 0px and selected text
+   instead, and #reel was overflow:hidden so there was no scrollbar to grab.
+   Worse, under prefers-reduced-motion the pin was never built, which left a
+   nowrap row inside a clipping box with no mechanism at all — card 04, the
+   one public repository on the page, measured 0% visible and unreachable.
+
+   Native overflow gives all of it back at once, and for free: a scrollbar,
+   trackpad and shift+wheel, touch drag, find-in-page, Home/End, and the same
+   behaviour with JavaScript off. The scrub bought motion; it cost the
+   section's reachability. */
+#reel{padding:36px 0 44px; position:relative}
 .reel-head{padding:124px 0 40px}
-.rail{display:flex; gap:24px; padding:0 30px}
+.rail{display:flex; gap:24px; padding:0 30px;
+  overflow-x:auto; overflow-y:hidden;
+  scroll-snap-type:x proximity; overscroll-behavior-x:contain;
+  scroll-behavior:smooth; cursor:grab;
+  /* The scrollbar is the one control the reader is guaranteed to recognise,
+     so it is drawn from the palette rather than left as a browser default. */
+  scrollbar-width:thin; scrollbar-color:var(--line-strong) transparent}
+.rail::-webkit-scrollbar{height:10px}
+.rail::-webkit-scrollbar-track{background:transparent}
+.rail::-webkit-scrollbar-thumb{background:var(--line-strong); border-radius:999px;
+  border:3px solid transparent; background-clip:content-box}
+.rail::-webkit-scrollbar-thumb:hover{background:var(--muted); background-clip:content-box}
+/* When all four cards already fit — a 4K display, or a wide laptop — there is
+   nothing to scroll, so the row centres instead of hugging the left edge and
+   the scrollbar does not appear. */
+.rail.fits{justify-content:center; overflow-x:hidden}
+/* Nothing to navigate when every card is already on screen: the arrows, the
+   progress track and the stepper all describe a scroll position that cannot
+   change. They are removed rather than disabled, because a permanently
+   disabled control is worse than no control. */
+.rail.fits ~ .reel-bar{display:none}
+/* Drag-to-pan. Snap and smooth both fight a pointer that is already holding
+   the exact position it wants. */
+.rail.dragging{cursor:grabbing; scroll-behavior:auto; scroll-snap-type:none;
+  user-select:none}
+.rail.dragging .slab{pointer-events:none}
 /* The inset hairline is the whole difference between a rectangle of --surface
    and a card with a material: a lit top edge says the panel has thickness and
    a light source, which is the same light the hero bloom comes from. It is
    carried on box-shadow rather than a border so it sits inside the radius. */
-.slab{flex:0 0 clamp(300px,33vw,450px); background:var(--surface);
+.slab{flex:0 0 clamp(300px,33vw,436px); background:var(--surface);
   border:1px solid var(--line-strong); border-radius:18px; padding:32px 30px 28px;
   display:flex; flex-direction:column; position:relative; overflow:hidden;
   box-shadow:inset 0 1px 0 var(--inset-hi);
+  scroll-snap-align:center;
   transition:border-color .3s ease, background .3s ease}
 .slab:hover,.slab:focus-within{border-color:var(--accent); background:var(--surface-2)}
 .slab .no{position:absolute; top:14px; right:18px;
@@ -593,8 +630,6 @@ h2 .hl{color:var(--accent)}
 .slab .out strong{font-family:"Bricolage Grotesque",Arial,sans-serif; font-weight:800;
   font-variation-settings:"wdth" 82; font-size:1.625rem; color:var(--accent);
   letter-spacing:-.035em; font-variant-numeric:tabular-nums; white-space:nowrap}
-.reel-note{font-family:"JetBrains Mono",monospace; font-size:0.75rem; letter-spacing:.16em;
-  text-transform:uppercase; color:var(--muted)}
 .tally{font-size:1rem; color:var(--bone-2); margin:24px 0 0; max-width:60ch}
 .tally b{color:var(--bone); font-weight:600}
 
@@ -882,9 +917,11 @@ footer a:hover{color:var(--accent); border-color:var(--accent)}
             translateZ(calc(var(--lift) * 1px));
   transition:border-color .3s ease, background .3s ease, box-shadow .45s ease,
              transform .5s cubic-bezier(.2,.9,.3,1)}
-/* While the rail is scrubbing, --pass changes every frame; a half-second ease on
-   top of that reads as lag. JS adds .scrubbing for the duration of the pin. */
-.rail.scrubbing .slab{transition:border-color .3s ease, background .3s ease,
+/* --pass changes every frame the rail is moving; a half-second ease on top of
+   that reads as lag behind the scroll. JS adds .panning for the duration of a
+   scroll and drops it 120ms after the last event, so the pointer tilt keeps
+   its ease everywhere else. */
+.rail.panning .slab{transition:border-color .3s ease, background .3s ease,
   box-shadow .45s ease}
 .slab .glare{position:absolute; inset:0; z-index:3; pointer-events:none;
   opacity:0; transition:opacity .4s ease; border-radius:inherit;
@@ -973,26 +1010,39 @@ footer a:hover{color:var(--accent); border-color:var(--accent)}
 .close .links a:hover,.close .links a:focus-visible{
   color:var(--accent); background-size:100% 1px, 100% 1px}
 
-/* ══ reel progress ═══════════════════════════════════════════════════════
-   The pin removes the scrollbar's account of where you are inside seven cards.
-   This gives it back, and doubles as the count the header promises. */
-/* Lives inside the pinned box, so it stays on screen while the cards move. */
-.reel-bar{position:absolute; left:30px; right:30px; bottom:16px;
-  display:flex; align-items:center; gap:16px}
+/* ══ reel controls ═══════════════════════════════════════════════════════
+   Sits in normal flow underneath the rail. It used to be position:absolute
+   inside #reel, which was fine while #reel was the pinned box and fatal once
+   anything scrolled it: the bar slid 478px off its own frame. In flow it
+   cannot detach from the thing it controls. */
+.reel-bar{display:flex; align-items:center; gap:16px;
+  max-width:1280px; margin:22px auto 0; padding:0 30px}
 .reel-bar .rt{position:relative; flex:1; height:2px; background:var(--line)}
-.reel-bar .rf{position:absolute; inset:0 auto 0 0; width:0; background:var(--accent)}
-/* The steps. Numbered rather than dotted: four dots say "there is more",
-   four numbers say how much more and which one you are on — the thing the
-   pinned scrub takes away. */
-.reel-bar .steps{display:flex; gap:6px; flex:none}
-.reel-bar .st{width:34px; min-height:34px; padding:0; cursor:pointer;
-  display:grid; place-items:center; border-radius:9px;
-  background:transparent; border:1px solid var(--line);
-  font-family:"JetBrains Mono",monospace; font-size:0.75rem; letter-spacing:.06em;
-  color:var(--muted); font-variant-numeric:tabular-nums;
+.reel-bar .rf{position:absolute; inset:0 auto 0 0; width:0; background:var(--accent);
+  transition:width .18s linear}
+/* Prev/next. The single most-reached-for control on a horizontal strip, and
+   the page had none: the only way through was four numbered chips 1,200px
+   away from the instruction that described them. 38px so the pair clears the
+   WCAG 2.5.8 target floor with room, and they disable at the ends rather than
+   disappearing, so the row never reflows under the cursor. */
+.reel-bar .nav{display:flex; gap:6px; flex:none}
+.reel-bar .ar,.reel-bar .st{padding:0; cursor:pointer; display:grid;
+  place-items:center; border-radius:9px; background:transparent;
+  border:1px solid var(--line); color:var(--muted);
+  font-family:"JetBrains Mono",monospace; font-size:0.75rem;
+  font-variant-numeric:tabular-nums;
   transition:color .2s var(--ease-out), border-color .2s var(--ease-out),
-             background .2s var(--ease-out)}
-.reel-bar .st:hover{color:var(--bone); border-color:var(--line-strong)}
+             background .2s var(--ease-out), opacity .2s var(--ease-out)}
+.reel-bar .ar{width:38px; min-height:38px}
+.reel-bar .ar svg{width:15px; height:15px; fill:none; stroke:currentColor;
+  stroke-width:1.6; stroke-linecap:square}
+.reel-bar .ar:hover:not(:disabled),.reel-bar .st:hover{
+  color:var(--bone); border-color:var(--line-strong)}
+.reel-bar .ar:disabled{opacity:.34; cursor:default}
+/* The steps. Numbered rather than dotted: four dots say "there is more",
+   four numbers say how much more and which one you are on. */
+.reel-bar .steps{display:flex; gap:6px; flex:none}
+.reel-bar .st{width:34px; min-height:34px; letter-spacing:.06em}
 .reel-bar .st[aria-current="true"]{color:var(--on-accent); background:var(--accent);
   border-color:var(--accent)}
 
@@ -1086,7 +1136,12 @@ footer a:hover{color:var(--accent); border-color:var(--accent)}
   .stats div:first-child,.stats div:nth-child(2n+1){border-right:0}
   .split{grid-template-columns:1fr; gap:34px}
   .sticky{position:static}
-  .slab{flex:1 1 100%}
+  /* .slab{flex:1 1 100%} used to live here, because below this width the rail
+     wrapped into a one-card-per-row grid. The rail scrolls at every width now,
+     so that rule squashed all four cards onto one screen: measured 151px wide
+     at 768px. The base flex-basis — clamp(300px,33vw,436px), shrink 0 — is
+     what a horizontal scroller wants, and 300px inside a 390px phone leaves
+     the next card peeking, which is the affordance that says keep going. */
   .tl-row{grid-template-columns:1fr; gap:8px}
   .pad{padding:72px 0}
   .reel-head{padding:72px 0 34px}
@@ -1104,27 +1159,18 @@ footer a:hover{color:var(--accent); border-color:var(--accent)}
   .field .shot,.plate .frame,.portrait,.cols article,.stats div{transform:none}
 }
 
-/* The pin is gated on height as well as width, so a short laptop or a zoomed
-   window gets the wrapped grid rather than a clipped pinned card. The JS
-   matchMedia keys below mirror these two queries exactly. */
-@media (max-width:1000px), (max-height:839px){
-  .rail{flex-wrap:wrap; padding-inline:0}
-  .reel-note,.reel-bar{display:none}
-  #reel{padding:0}
-}
-@media (min-width:1001px) and (min-height:840px){
-  /* While pinned the rail sits under the fixed dock (y 12–80); without this the
-     client line and number of the centred card are hidden for the whole scrub.
-     Card (~695px) + this headroom + the bar is what sets the 840px pin gate. */
-  #reel{padding-top:96px; padding-bottom:48px}
+/* The 840px height gate and its wrapped-grid fallback are both gone with the
+   pin. They existed so a short viewport would not get a clipped pinned card,
+   and at their own 1001x840 boundary they still clipped the stepper. One
+   scroller behaves identically at every size, so there is nothing left to
+   branch on: the rail scrolls when the cards do not fit and centres them
+   when they do. */
+@media (max-width:1000px){
+  #reel{padding:0 0 8px}
+  .reel-bar{margin-top:18px; padding:0 22px}
 }
 @media (min-width:1001px) and (max-height:899px){
   .slab{padding:26px 26px 22px}
-}
-@media (min-width:1001px) and (max-height:839px){
-  /* 0 1 not 1 1: a card alone on the last row must keep its width rather than
-     stretching across and reading as a different component. */
-  .slab{flex:0 1 clamp(300px,30vw,420px)}
 }
 @media (max-width:560px){
   /* 9.2vw put a 33px h1 above 18px body copy: the headline stopped being the
@@ -1154,6 +1200,38 @@ footer a:hover{color:var(--accent); border-color:var(--accent)}
   .close .links{gap:6px 28px}
   .close .links a{display:inline-block; padding:13px 0}
 }
+/* ══ Windows High Contrast / forced-colors ═══════════════════════════════
+   The OS replaces every author colour with a four-colour system palette, so
+   anything this page says with colour alone stops saying it. Measured with
+   forced-colors emulated: the signal-red fill on the current step became
+   Canvas, and the current step was then indistinguishable from the other
+   three — the readout that tells you where you are in the reel disappeared.
+   Same for the progress fill and the guide's own accent.
+
+   The fix is not to force the red back. It is to restate in a system colour,
+   and to give the current state a second, non-colour signal. */
+@media (forced-colors: active){
+  /* Keep the acquisition marks and schematic strokes visible: they are drawn
+     in currentColor, which the OS maps for us. */
+  .reel-bar .st[aria-current="true"]{
+    forced-color-adjust:none;
+    background:Highlight; color:HighlightText; border-color:Highlight}
+  /* Colour is never the only carrier. An outline survives every palette. */
+  .reel-bar .st[aria-current="true"]{outline:2px solid CanvasText; outline-offset:2px}
+  .reel-bar .rf{forced-color-adjust:none; background:Highlight}
+  .reel-bar .rt{border-top:1px solid CanvasText}
+  .reel-bar .ar:disabled{opacity:1; color:GrayText; border-color:GrayText}
+  /* The card's own hairline and the hover accent both collapse to the same
+     system border, so the hovered/focused card needs its own mark. */
+  .slab:hover,.slab:focus-within{outline:2px solid Highlight; outline-offset:-2px}
+  /* Photography is decoration here and the OS may invert it to mud; the
+     brackets and captions carry the meaning. */
+  .atmo,.glare,.grain{display:none}
+  /* Focus must never depend on the author palette. */
+  a:focus-visible,button:focus-visible,select:focus-visible,[tabindex]:focus-visible{
+    outline:3px solid CanvasText; outline-offset:2px}
+}
+
 @media (prefers-reduced-motion:reduce){
   /* Suppress movement, not feedback.
 
@@ -1174,6 +1252,9 @@ footer a:hover{color:var(--accent); border-color:var(--accent)}
     transition-duration:.12s!important}
   .btn:active,.btn.ghost:active,.dock button:active,.hail:active{transform:none}
   html{scroll-behavior:auto}
+  /* The rail is a scroll container of its own, so html's value does not
+     reach it and every stepper jump would still animate. */
+  .rail{scroll-behavior:auto}
   h1 .ln > span, h2 .ln > span, html.js h1 .ln > span{transform:none!important}
   /* Depth is movement: the tilt, the lift and the parallax all go, but the
      border and colour feedback above still lands so hover stays legible. */
@@ -1412,7 +1493,6 @@ footer a{display:inline-flex; align-items:center; min-height:24px}
 :root:lang(ja) .also .who,:root:lang(zh) .also .who,
 :root:lang(ja) .also .go,:root:lang(zh) .also .go,
 :root:lang(ja) .also-label,:root:lang(zh) .also-label,
-:root:lang(ja) .reel-note,:root:lang(zh) .reel-note,
 :root:lang(ja) .tl-row .when,:root:lang(zh) .tl-row .when,
 :root:lang(ja) .links-label,:root:lang(zh) .links-label,
 :root:lang(ja) .band .over p,:root:lang(zh) .band .over p,
@@ -1751,19 +1831,29 @@ footer a{display:inline-flex; align-items:center; min-height:24px}
         <ul class="tags"><li><span class="t">PyTorch</span><span class="sr-only" data-i18n="tag.pytorch">The framework this project trains in, and the one most vision research ships in.</span></li><li><span class="t">TensorFlow</span><span class="sr-only" data-i18n="tag.tf">The framework the original implementation used; this work keeps both paths supported.</span></li><li><span class="t">Reinforcement learning</span><span class="sr-only" data-i18n="tag.rl">Learning from reward rather than from labelled answers — the method behind the chess engine.</span></li></ul>
         <div class="out"><span data-i18n-html="work.c4.out"><strong>188&#9733;</strong> stars on PyTorch AnimeGAN</span><span class="sr-only" data-i18n="metric.c4">Stars on the upstream open-source project this work was merged into.</span></div>
         <a class="go open" href="https://github.com/miniHaLe" target="_blank" rel="noopener"
-           data-i18n-attr="aria-label:work.c4.aria" aria-label="Open the source on GitHub (opens in a new tab)"><span data-i18n="work.cta.open">Open on GitHub</span> <span aria-hidden="true">&#8599;</span></a>
+           data-i18n-attr="aria-label:work.c4.aria" aria-label="Open on GitHub, the source for PyTorch AnimeGAN and tooling (opens in a new tab)"><span data-i18n="work.cta.open">Open on GitHub</span> <span aria-hidden="true">&#8599;</span></a>
         <span class="note" data-i18n="work.note.public">Public &middot; no request needed</span>
         <p class="exp" aria-hidden="true"></p>
       </article>
     </div>
-    <!-- Was a read-only progress bar with aria-hidden. The reel is a pinned
-         horizontal scrub: without a way to jump, a reader who wants card 4
-         has to scroll the whole rail and has no idea what is ahead. These are
-         real buttons; each takes its accessible name from its own card's
-         heading, which is already translated. -->
+    <!-- Real buttons, not a read-only progress bar. Each step takes its
+         accessible name from its own card's heading, which is already
+         translated, so the stepper localises with no keys of its own.
+         The arrows are here because they are the first thing a mouse reaches
+         for on a horizontal strip and the page had none; the rail's own
+         scrollbar is the second. -->
     <nav class="reel-bar" id="reelBar" data-i18n-attr="aria-label:work.reel.aria"
          aria-label="Selected work, four systems">
-      <span class="reel-note" aria-hidden="true" data-i18n="work.reel.note">Scroll or pick</span>
+      <span class="nav">
+        <button type="button" class="ar" id="reelPrev"
+                data-i18n-attr="aria-label:work.reel.prev" aria-label="Previous project">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 2 4 8l6 6"/></svg>
+        </button>
+        <button type="button" class="ar" id="reelNext"
+                data-i18n-attr="aria-label:work.reel.next" aria-label="Next project">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 2l6 6-6 6"/></svg>
+        </button>
+      </span>
       <span class="rt" aria-hidden="true"><span class="rf" id="reelFill"></span></span>
       <span class="steps" id="reelSteps"></span>
     </nav>
@@ -1775,17 +1865,17 @@ footer a{display:inline-flex; align-items:center; min-height:24px}
         <div><h3 data-i18n="also.i1.h3">KichiKichi belt counting</h3>
           <p data-i18n="also.i1.p">Every dish counted by category as it travels the belt, across two cameras, with belt-number
              OCR and a live dashboard for store managers. Live in a national restaurant chain.</p></div>
-        <a class="go" href="mailto:thanhha.le@outlook.com?subject=Repository%20access%3A%20KichiKichi%20belt%20counting" data-i18n-attr="aria-label:also.i1.aria" aria-label="Request repository access for KichiKichi belt counting"><span data-i18n="work.cta.requestShort">Request access</span> <span aria-hidden="true">&rarr;</span></a></li>
+        <a class="go" href="mailto:thanhha.le@outlook.com?subject=Repository%20access%3A%20KichiKichi%20belt%20counting" data-i18n-attr="aria-label:also.i1.aria" aria-label="Request access to the KichiKichi belt counting repository"><span data-i18n="work.cta.requestShort">Request access</span> <span aria-hidden="true">&rarr;</span></a></li>
       <li><span class="who" data-i18n="also.i2.who">Independent &middot; 2026</span>
         <div><h3 data-i18n="also.i2.h3">Financial analytics platform</h3>
           <p data-i18n="also.i2.p">Messy client workbooks reconciled into structured tables; the system proposes, a human
              confirms. 101 findings from security review closed across three releases.</p></div>
-        <a class="go" href="mailto:thanhha.le@outlook.com?subject=Repository%20access%3A%20Financial%20analytics%20platform" data-i18n-attr="aria-label:also.i2.aria" aria-label="Request repository access for the financial analytics platform"><span data-i18n="work.cta.requestShort">Request access</span> <span aria-hidden="true">&rarr;</span></a></li>
+        <a class="go" href="mailto:thanhha.le@outlook.com?subject=Repository%20access%3A%20Financial%20analytics%20platform" data-i18n-attr="aria-label:also.i2.aria" aria-label="Request access to the financial analytics platform repository"><span data-i18n="work.cta.requestShort">Request access</span> <span aria-hidden="true">&rarr;</span></a></li>
       <li><span class="who" data-i18n="also.i3.who">Independent &middot; 2026</span>
         <div><h3 data-i18n="also.i3.h3">Multi-branch operations platform</h3>
           <p data-i18n="also.i3.p">One system across an appliance-repair chain, replacing spreadsheets. Branch-level data
              separation enforced inside the access token; 21 business resources live.</p></div>
-        <a class="go" href="mailto:thanhha.le@outlook.com?subject=Repository%20access%3A%20Multi-branch%20operations%20platform" data-i18n-attr="aria-label:also.i3.aria" aria-label="Request repository access for the multi-branch operations platform"><span data-i18n="work.cta.requestShort">Request access</span> <span aria-hidden="true">&rarr;</span></a></li>
+        <a class="go" href="mailto:thanhha.le@outlook.com?subject=Repository%20access%3A%20Multi-branch%20operations%20platform" data-i18n-attr="aria-label:also.i3.aria" aria-label="Request access to the multi-branch operations platform repository"><span data-i18n="work.cta.requestShort">Request access</span> <span aria-hidden="true">&rarr;</span></a></li>
     </ul>
   </div>
 </section>
@@ -1942,9 +2032,9 @@ footer a{display:inline-flex; align-items:center; min-height:24px}
      English is not here. It is read out of the markup above at boot, so the
      authored copy and the "en" dictionary cannot drift apart: there is only
      one copy of it and it is the one the reader sees with JavaScript off. -->
-<script type="application/json" id="i18n-vi">{"doc.title":"Le Nguyen Thanh Ha — Kỹ sư sản phẩm AI","doc.description":"Kỹ sư sản phẩm AI tại Thành phố Hồ Chí Minh. Các hệ thống thị giác máy tính và LLM chạy thật trong môi trường production: chấm điểm quầy kệ bán lẻ, vận hành nhà hàng, giám sát sàn casino. 797 commit qua 75 pull request đã được review, ai cũng có thể tự kiểm chứng.","nav.skip":"Tới nội dung chính","nav.aria":"Điều hướng chính","nav.work":"Dự án","nav.method":"Cách làm","nav.stack":"Công cụ","nav.contact":"Liên hệ","nav.lang":"Ngôn ngữ","nav.theme.toLight":"Chuyển sang giao diện sáng","nav.theme.toDark":"Chuyển sang giao diện tối","hail.aria":"Liên hệ với tôi qua email","hail.text":"Liên hệ","hail.short":"Email","hero.tagline":"[ LE NGUYEN THANH HA · KỸ SƯ SẢN PHẨM AI ]","hero.h1":["Tôi dạy máy móc","<span class=\"hl\">quan sát, đánh giá,<\/span>","và báo cáo."],"hero.thesis":"Hướng một chiếc camera vào một bài toán kinh doanh thật, tôi biến nó thành phần mềm <b>tự thu hồi lại chi phí<\/b>: mô hình, backend, hạ tầng, và cái màn hình mà người quản lý thật sự mở ra xem.","hero.cta.work":"Xem dự án","hero.cta.cv":"Tải CV","hero.dlmeta":"PDF · 270 KB · cập nhật tháng 9 2026","hero.scroll":"Cuộn","hero.meta.now.k":"Hiện tại","hero.meta.now.v":"AI Engineer tại DFlo, từ 7/2025 đến nay · 3 năm đưa AI vào production","hero.meta.based.k":"Nơi ở","hero.meta.based.v":"Thành phố Hồ Chí Minh · sẵn sàng chuyển ra Hà Nội hoặc làm remote","hero.meta.open.k":"Sẵn sàng cho","hero.meta.open.v":"Toàn thời gian hoặc hợp đồng theo phạm vi cố định · nhận việc ngay","field.eyebrow":"[ PHẦN MỀM NHÌN THẤY GÌ ]","field.img.alt":"Một lối đi trong siêu thị được chụp chính diện: ba tầng kệ xếp đầy mặt hàng gia dụng, có một khoảng trống nơi hàng đã bán hết.","field.svg.alt":"Cũng chính kệ hàng đó với bốn vùng nhận diện được vẽ lên: một dãy sáu mặt sản phẩm, một mặt sản phẩm riêng lẻ, một khối mã hàng, và một khoảng trống nơi kệ đã bán hết hàng.","field.hud.source":"Nguồn · ảnh kệ hàng CC0","field.hud.det":"Nhận diện · <b>4<\/b>","field.hud.classes":"Lớp · kệ, mặt hàng, khoảng trống","field.hud.overlay":"Lớp phủ · vẽ tay, không phải suy luận","field.cap":"Đây là dữ liệu đầu vào thật, không phải hình minh họa. Một mô hình chấm điểm quầy kệ đọc khung ảnh này thành các tầng kệ, các mặt hàng và những khoảng trống giữa chúng, rồi quy đổi thành điểm tuân thủ mà trước đây nhân viên kiểm tra thị trường phải tự tính bằng tay. Các khung ở trên được vẽ tay để minh họa bộ từ vựng đó. Những hệ thống đang chạy thật nằm sau các thỏa thuận NDA với khách hàng, nên các sơ đồ bên dưới mô tả cơ chế thay vì chiếu lại hình ảnh thực tế.","what.eyebrow":"[ TÔI THỰC SỰ LÀM GÌ ]","what.h2":["Hầu hết AI dừng lại","ở bản demo. Của tôi","trụ được <span class=\"hl\">giờ cao điểm.<\/span>"],"what.c1.idx":"01 · NHÌN","what.c1.h3":"Thị giác trụ được trong một căn phòng thật","what.c1.p":"Nhận diện, theo vết và tái định danh dưới những góc camera xấu, ảnh méo fisheye và những người đi che lẫn nhau. 95% mAP ở 25 FPS trên một GPU, không phải trên dàn máy đo benchmark.","what.c2.idx":"02 · PHÁN ĐỊNH","what.c2.h3":"Mô hình đưa ra kết luận bảo vệ được","what.c2.p":"Các mô hình thị giác - ngôn ngữ và agent LLM có guardrail, chấm điểm một món ăn, gắn cờ một kệ hàng, hoặc trả lời câu hỏi của người quản lý bằng ngôn ngữ thường ngày, để câu trả lời có thể đem ra tranh luận chứ không chỉ để tin.","what.c3.idx":"03 · GIAO HÀNG","what.c3.h3":"Nửa công việc không hào nhoáng","what.c3.p":"Microservice, xác thực, phân quyền theo vai trò, CI/CD có rollback, giao diện bốn ngôn ngữ, và tài liệu để khách hàng tự vận hành khi tôi không còn ở đó.","plate.img.alt":"Một dây bếp nhà hàng giữa giờ phục vụ: các chảo trên bếp lửa hở, một chảo đang được đảo bằng kẹp gắp, phía sau là các đĩa phục vụ xếp chồng.","plate.caption":"Căn phòng mà phần mềm phải trụ được","plate.lede":"Một mô hình đúng trong notebook nhưng sai vào 12:40 trưa thứ Sáu thì coi như chưa được làm xong. Mọi hệ thống bên dưới đều được tinh chỉnh đúng theo cái giờ mà nó thực sự chạy: vật che, khói bếp, góc camera xấu, nhân viên di chuyển nhanh hơn cả tốc độ khung hình.","stats.aria":"Thành tích thể hiện bằng số liệu","stats.s1":"Hệ thống đang chạy production","stats.s2":"Thông lượng trên cùng một mức chi phí GPU","stats.s3":"Phát hiện từ đợt review bảo mật đã xử lý xong","stats.s4":"Số ngôn ngữ có ngay ngày ra mắt","stats.s5":"Hệ thống khách hàng tự làm một mình","work.eyebrow":"[ DỰ ÁN CHỌN LỌC · SỔ TAY THỰC ĐỊA ]","work.h2":["Mười hai hệ thống","đang vận hành. <span class=\"hl\">Bốn<\/span>","<span class=\"hl\">được kể chi tiết.<\/span>"],"work.tally":"<b>Tổng cộng mười hai:<\/b> bốn tại DFlo, một tại Viettel Solutions, một tại Rainscales, sáu hệ thống tự làm một mình cho các doanh nghiệp vừa và nhỏ. Bốn dự án dưới đây, mỗi dự án đều kèm một con số bạn kiểm chứng được hoặc một repository bạn mở ra xem được.","work.reel.note":"Cuộn hoặc chọn","work.c1.who":"Viettel Solutions · 2023–25","work.c1.viz":"Sơ đồ: ba tầng kệ xếp mặt hàng, một mặt hàng được khoanh vùng và chấm điểm bởi mô hình thị giác","work.c1.h3":"TesselAI · chấm điểm quầy kệ bán lẻ","work.c1.p":"Tôi tìm ra cơ hội, viết business case, rồi tự xây và phát hành: thị giác máy tính chấm điểm ảnh chụp thị trường một cách tự động và xóa bỏ khâu rà soát kiểm tra thủ công tại điểm bán.","work.c1.out":"<strong>120<\/strong> RPS tại TP95 · đang dùng thương mại · ~3× trên cùng một GPU","work.c1.aria":"Xin quyền truy cập repository của TesselAI, hệ thống chấm điểm quầy kệ bán lẻ","work.c2.who":"DFlo · 2025–nay","work.c2.viz":"Sơ đồ: sáu service nằm sau một API gateway duy nhất","work.c2.h3":"Sauron · AI vận hành nhà hàng","work.c2.p":"Sáu service sau một gateway: theo dõi bàn trống theo thời gian thực, bản đồ nhiệt luồng di chuyển, kiểm soát chất lượng món ăn tự động, và một chat agent trả lời câu hỏi vận hành dựa trên dữ liệu lịch sử. Tôi là tác giả chính.","work.c2.out":"<strong>399<\/strong> commit · EN / VI / JA / ZH ngay khi ra mắt","work.c2.aria":"Xin quyền truy cập repository của Sauron, hệ thống AI vận hành nhà hàng","work.c3.who":"Rainscales · 2025","work.c3.viz":"Sơ đồ: vùng phủ của camera fisheye trên một sàn, với một động tác giơ tay được nhận diện","work.c3.h3":"Giám sát thông minh sàn casino","work.c3.p":"Hai lớp đối tượng — khách và nhân viên — được nhận diện dưới những vị trí đặt camera đã làm các lần thử trước thất bại, cộng thêm nhận diện động tác để nhân viên sàn được điều tới đúng khách đang giơ tay.","work.c3.out":"<strong>95%<\/strong> mAP ở ~25 FPS trên một GPU","work.c3.aria":"Xin quyền truy cập repository của hệ thống giám sát thông minh sàn casino","work.c4.who":"Mã nguồn mở","work.c4.viz":"Sơ đồ: chuyển đổi ảnh sang ảnh trên một pipeline huấn luyện đa GPU","work.c4.h3":"PyTorch AnimeGAN và bộ công cụ","work.c4.p":"Cải thiện độ ổn định khi huấn luyện và hỗ trợ đa GPU cho một dự án sinh ảnh được dùng rộng rãi; cùng với một công cụ tính VRAM cho tác vụ mô hình ngôn ngữ và một engine chơi cờ viết từ đầu.","work.c4.out":"<strong>188★<\/strong> sao trên PyTorch AnimeGAN","work.c4.aria":"Mở mã nguồn trên GitHub (mở trong tab mới)","work.cta.request":"Xin quyền truy cập repository","work.cta.requestShort":"Xin truy cập","work.cta.open":"Mở trên GitHub","work.note.nda":"Email · NDA hai chiều · phản hồi trong hai ngày làm việc","work.note.public":"Công khai · không cần xin quyền","also.label":"Các hệ thống khác đã giao","also.i1.who":"Golden Gate Group · 2025","also.i1.h3":"Đếm món trên băng chuyền KichiKichi","also.i1.p":"Từng món ăn được đếm theo nhóm khi đi qua băng chuyền, trên hai camera, kèm OCR số băng và một dashboard theo thời gian thực cho quản lý cửa hàng. Đang chạy thật trong một chuỗi nhà hàng toàn quốc.","also.i1.aria":"Xin quyền truy cập repository của hệ thống đếm món trên băng chuyền KichiKichi","also.i2.who":"Làm độc lập · 2026","also.i2.h3":"Nền tảng phân tích tài chính","also.i2.p":"Các bảng tính rối rắm của khách hàng được đối soát thành bảng dữ liệu có cấu trúc; hệ thống đề xuất, con người xác nhận. 101 phát hiện từ đợt review bảo mật đã được xử lý xong qua ba bản phát hành.","also.i2.aria":"Xin quyền truy cập repository của nền tảng phân tích tài chính","also.i3.who":"Làm độc lập · 2026","also.i3.h3":"Nền tảng vận hành nhiều chi nhánh","also.i3.p":"Một hệ thống duy nhất cho cả chuỗi sửa chữa điện máy, thay thế các bảng tính. Việc phân tách dữ liệu theo chi nhánh được cưỡng chế ngay trong access token; 21 nhóm nghiệp vụ đang chạy thật.","also.i3.aria":"Xin quyền truy cập repository của nền tảng vận hành nhiều chi nhánh","band.p":"Phần không ai chụp ảnh","band.b":"Camera thì rẻ.<br>Bảo vệ được câu trả lời thì không.","method.eyebrow":"[ CÁCH TÔI LÀM VIỆC ]","method.h2":["Ai cũng có thể bắt","mô hình <span class=\"hl\">đồng ý<\/span>","với mình."],"method.lede":"Việc cần làm là xây được thứ có thể đem ra kiểm toán.","method.a.h3":"Tự động hóa đề xuất, con người phê duyệt","method.a.p":"Không có suy luận nào của hệ thống được coi là sự thật cho tới khi có người xác nhận.","method.b.h3":"Không có lỗi âm thầm","method.b.p":"Dead-letter queue và các lỗi chẩn đoán được. Một lượt xử lý thất bại luôn hiện ra và luôn khôi phục được.","method.c.h3":"Cổng kiểm thử trung thực","method.c.p":"Các phép kiểm tra độ chính xác sẽ bỏ qua chứ không báo đạt khi thiếu dữ liệu kiểm định thật. Yên tâm giả còn tệ hơn là không yên tâm.","method.d.h3":"Phân quyền ngay từ thiết kế","method.d.p":"Phân tách được cưỡng chế trong token, phản hồi theo nguyên tắc đặc quyền tối thiểu, quyền hạn gắn vào đúng những hành động quan trọng.","method.e.h3":"Phát hành có thể đảo ngược","method.e.p":"Continuous delivery với rollback tự động, và runbook để không việc gì phụ thuộc vào việc liên lạc được với một người duy nhất.","method.f.h3":"Bàn giao cũng là một sản phẩm giao","method.f.p":"Tài liệu kiến trúc và vận hành được viết song song với code, không phải viết sau.","stack.eyebrow":"[ TÔI XÂY BẰNG NHỮNG GÌ ]","stack.h2":["Công cụ tôi dùng,","nói rõ để bạn","<span class=\"hl\">tự đối chiếu.<\/span>"],"stack.lede":"Mọi thứ bên dưới đều nằm trong một hệ thống đã giao thật, không phải trên một tấm chứng chỉ khóa học.","stack.g1.h3":"Thị giác và mô hình","stack.g1.items":"YOLO11 · YOLOX · OpenCV · tái định danh và theo vết người · hiệu chỉnh fisheye · ước lượng độ sâu · PyTorch · TensorFlow · ONNX · Triton","stack.g2.h3":"Ngôn ngữ và agent","stack.g2.items":"Mô hình thị giác - ngôn ngữ Gemini · agent LLM có guardrail (Agno, LangChain) · sinh nội dung tăng cường bằng truy hồi · nhận dạng giọng nói · bộ nhớ hội thoại","stack.g3.h3":"Backend và dữ liệu","stack.g3.items":"Python (FastAPI, Celery, Flask) · TypeScript (NestJS, Express) · Go · PostgreSQL · MongoDB · Redis · cơ sở dữ liệu vector · PySpark · Pandas · Power BI","stack.g4.h3":"Giao diện","stack.g4.items":"Next.js · React · TypeScript · Tailwind · triển khai đa ngôn ngữ (EN / VI / JA / ZH) · khắc phục lỗi trợ năng · kiểm thử tự động","stack.g5.h3":"Cloud và vận hành","stack.g5.items":"Google Cloud · Microsoft Azure (Container Apps, hạ tầng dưới dạng mã) · Docker · CI/CD với rollback tự động · runner tự dựng · reverse proxy bảo mật và truy cập qua tunnel","track.eyebrow":"[ QUÁ TRÌNH LÀM VIỆC ]","track.aria":"Lịch sử công việc","track.r1.when":"7/2025 – nay","track.r1.h3":"AI Engineer · DFlo","track.r1.p":"Tác giả chính của Sauron. Ngoài ra còn giao hệ thống đếm món trên băng chuyền cho Golden Gate, một nền tảng phân tích video xử lý kho tư liệu 24h+, và hệ thống phân tích cuộc họp triển khai lên Azure bằng hạ tầng dưới dạng mã.","track.r2.when":"11/2024 – 8/2026","track.r2.h3":"Hành nghề độc lập · hợp đồng theo phạm vi cố định","track.r2.p":"Sáu hệ thống nghiệp vụ chạy production tự làm một mình cho các doanh nghiệp vừa và nhỏ Việt Nam: từ khảo sát yêu cầu, qua review bảo mật, tới triển khai và bàn giao, cho những khách hàng không có bộ phận IT nội bộ.","track.r3.when":"2 – 6/2025","track.r3.h3":"AI Engineer · Rainscales (hợp đồng)","track.r3.p":"Nhận diện người trên sàn casino và nhận diện động tác; các quy tắc bố trí kho cho Linfox suy ra từ ước lượng độ sâu.","track.r4.when":"6/2023 – 1/2025","track.r4.h3":"AI Engineer · Viettel Solutions","track.r4.p":"Đưa TesselAI từ một đề xuất nội bộ thành sản phẩm thương mại chạy production, và đạt mức tăng ~3× thông lượng suy luận trên phần cứng không đổi.","close.eyebrow":"[ LIÊN HỆ ]","close.h2":["Bạn có camera và","một bài toán, tôi có","<span class=\"hl\">hồ sơ triển khai.<\/span>"],"close.lede":"Ba cách để làm việc cùng tôi: một vị trí toàn thời gian, một hợp đồng dự án theo phạm vi cố định giao theo từng giai đoạn có cổng ký xác nhận, hoặc một technical lead làm việc trực tiếp trong đội của bạn. Sẵn sàng chuyển ra Hà Nội hoặc làm remote.","close.cta.start":"Bắt đầu trao đổi","close.reply":"Hãy nói cho tôi biết camera và bài toán. Tôi phản hồi trong hai ngày làm việc, và các repository riêng tư sẽ được mở ra để bạn xem dưới một NDA hai chiều.","close.portrait.caption":"Le Nguyen Thanh Ha · Thành phố Hồ Chí Minh","close.portrait.alt":"Le Nguyen Thanh Ha, ảnh chụp ngoài trời tại Thành phố Hồ Chí Minh.","close.said":"Mười hai hệ thống chạy production, sáu trong số đó tôi tự làm một mình từ khảo sát yêu cầu tới bàn giao, số còn lại tôi là tác giả chính trong một đội. <b>Tôi thà cho bạn xem một repository hơn là một portfolio.<\/b> Bạn cứ hỏi, tôi sẽ mở một cái.","close.spoken":"Tiếng Việt (bản ngữ) · tiếng Anh (thành thạo ở mức làm việc chuyên môn). Trang này được xuất bản bằng bốn ngôn ngữ, vì đúng cái lý do mà các sản phẩm cũng vậy.","close.linksLabel":"Hoặc liên hệ trực tiếp","close.copy":"Sao chép","close.copied":"Đã chép","close.copy.aria":"Sao chép địa chỉ email","footer.role":"Le Nguyen Thanh Ha · Kỹ sư sản phẩm AI","footer.verify":"797 commit · 75 pull request đã review · kiểm chứng trên GitHub ↗","ticker.pause":"Tạm dừng","ticker.play":"Chạy","ticker.pause.aria":"Tạm dừng danh sách công cụ và kỹ năng đang cuộn","ticker.play.aria":"Cho danh sách công cụ và kỹ năng cuộn tiếp","ticker.items":["Thị giác máy tính","YOLO11 + ReID","QC thị giác - ngôn ngữ","Theo vết đa camera","FastAPI · NestJS","Phân tích bằng agent","Triton · ONNX","Rollback tự động"],"cv.fallback.label":"Gửi email cho tôi để nhận CV","cv.fallback.meta":"PDF gửi kèm thư trả lời, thường trong ngày","guide.s1":"Bắt đầu từ đây. Đây là đầu vào mà mô hình kệ hàng đọc — các khung là từ vựng của nó. Tôi sẽ chỉ chỗ quan trọng; tắt tôi lúc nào cũng được.","guide.s2":"Ba việc tôi làm, theo đúng thứ tự một hệ thống làm: nhìn, phán định, giao hàng. Hãy đọc các con số, đừng đọc tính từ.","guide.s3":"Năm con số. Cái nào cũng kiểm chứng được, và xuống dưới tôi chỉ bạn cách làm.","guide.s4":"Phần chứng minh. Bốn hệ thống kể chi tiết — trên màn hình rộng, dải thẻ cuộn ngang. Mỗi thẻ kết lại bằng một con số bạn kiểm chứng được.","guide.s5":"Công việc được kiểm soát ra sao. Đây là phần bộ phận tài chính hay kiểm toán sẽ hỏi, và là phần hầu hết portfolio AI bỏ qua.","guide.s6":"Toàn bộ công cụ, viết ra thành danh sách. Đang tìm một công nghệ cụ thể? Hãy tìm ngay trong mục này.","guide.s7":"Ở đâu và khi nào: bốn vị trí trong ba năm, mới nhất xếp trước.","guide.off":"Tắt phần hướng dẫn xem trang","guide.on":"Bật lại phần hướng dẫn xem trang","guide.on.label":"?","tag.yolo":"Bộ nhận diện vật thể chỉ cần một lượt: một lần nhìn khung ảnh là trả về mọi khung bao tìm được, đủ nhanh cho video trực tiếp.","tag.seg":"Đường viền ở mức từng điểm ảnh thay vì khung bao — đủ để tách mặt hàng phía trước khỏi mặt hàng xếp ngay sau nó.","tag.triton":"Máy chủ suy luận của NVIDIA. Nó gộp các yêu cầu lại trên một GPU để một mô hình phục vụ được nhiều nơi gọi cùng lúc.","tag.onnx":"Một định dạng mô hình mang đi được: huấn luyện ở một framework, chạy ở bất cứ đâu, thường nhanh hơn runtime gốc.","tag.fastapi":"Một web framework Python sinh ra cho các API có kiểu dữ liệu rõ ràng, tự sinh tài liệu, và I/O bất đồng bộ.","tag.reid":"Nhận diện cộng tái định danh: cùng một người vẫn giữ nguyên ID sau khi đi qua phía sau một cây cột.","tag.vlm":"Một mô hình thị giác - ngôn ngữ. Nó xem một tấm ảnh rồi trả lời câu hỏi về tấm ảnh đó bằng lời.","tag.agno":"Một framework agent: mô hình ngôn ngữ được cấp công cụ, bộ nhớ, và quy tắc về những gì nó được phép khẳng định.","tag.next":"Framework React đứng sau dashboard — kết xuất phía server, điều hướng, và bản build bốn ngôn ngữ.","tag.yolox":"Hai dòng mô hình nhận diện, đem đo đối chiếu với nhau trên chính tư liệu của khách hàng chứ không phải trên một bộ dữ liệu công khai.","tag.fisheye":"Camera trần làm đường thẳng bị uốn cong. Hiệu chỉnh khử phần méo đó để một vị trí trên màn hình đúng là một vị trí trên sàn.","tag.multicam":"Một người được ba camera cùng nhìn thấy chỉ được đếm một lần, không phải ba lần.","tag.pytorch":"Framework mà dự án này huấn luyện trên đó, và cũng là nơi phần lớn nghiên cứu thị giác công bố kèm code.","tag.tf":"Framework mà bản cài đặt gốc đã dùng; công việc này giữ cho cả hai đường đều chạy được.","tag.rl":"Học từ phần thưởng thay vì từ đáp án được gán nhãn — phương pháp đứng sau engine chơi cờ.","metric.c1":"TP95 nghĩa là 95% yêu cầu hoàn tất nhanh hơn mức này. Nó nói về nhóm yêu cầu chậm nhất, thứ người dùng thực sự cảm nhận, không phải mức trung bình.","metric.c2":"Số commit do chính tôi viết trong repository này, không phải tổng của cả đội.","metric.c3":"mAP là độ chính xác trung bình bình quân: một con số cho biết mô hình nhận diện vừa đúng vừa không bỏ sót đến mức nào, trên mọi lớp.","metric.c4":"Số sao trên dự án mã nguồn mở gốc mà phần công việc này đã được merge vào.","work.reel.aria":"Dự án chọn lọc, bốn hệ thống"}</script>
-<script type="application/json" id="i18n-ja">{"doc.title":"Le Nguyen Thanh Ha — AIプロダクトエンジニア","doc.description":"ホーチミン市在住のAIプロダクトエンジニア。本番環境で動くコンピュータビジョンとLLMシステムを構築しています。小売棚のスコアリング、飲食店オペレーション、カジノフロアのインテリジェンス。797コミット、レビュー済みプルリクエスト75件、いずれも第三者が検証できます。","nav.skip":"本文へ移動","nav.aria":"メインナビゲーション","nav.work":"仕事","nav.method":"手法","nav.stack":"技術","nav.contact":"連絡","nav.lang":"言語","nav.theme.toLight":"ライトテーマに切り替える","nav.theme.toDark":"ダークテーマに切り替える","hail.aria":"メールで連絡する","hail.text":"ご連絡ください","hail.short":"メール","hero.tagline":"[ LE NGUYEN THANH HA · AIプロダクトエンジニア ]","hero.h1":["機械に教えるのは","<span class=\"hl\">見て、判断し、<\/span>","報告すること。"],"hero.thesis":"現実の業務課題にカメラを向け、それを<b>コストを回収する<\/b>ソフトウェアに変えます。モデル、バックエンド、インフラ、そして現場の責任者が実際に開く画面まで。","hero.cta.work":"実績を見る","hero.cta.cv":"CVをダウンロード","hero.dlmeta":"PDF · 270 KB · 2026年9月更新","hero.scroll":"スクロール","hero.meta.now.k":"現在","hero.meta.now.v":"DFloのAIエンジニア、2025年7月〜現在 · 本番AIを3年間出荷","hero.meta.based.k":"拠点","hero.meta.based.v":"ホーチミン市 · ハノイ転居またはリモート可","hero.meta.open.k":"希望","hero.meta.open.v":"フルタイムまたは範囲確定の受託 · 即日対応可","field.eyebrow":"[ ソフトウェアが見ているもの ]","field.img.alt":"スーパーマーケットの通路を正面から撮影した写真。家庭用品のフェイシングが並ぶ棚が3段あり、売り切れて空いた箇所があります。","field.svg.alt":"同じ棚に4つの検出結果を重ねた図。6個のフェイシングが並ぶ列、単体のフェイシング1つ、在庫管理単位のブロック1つ、そして売り切れて空いた箇所です。","field.hud.source":"出典 · CC0の棚写真","field.hud.det":"検出 · <b>4<\/b>","field.hud.classes":"クラス · 棚、フェイシング、欠品","field.hud.overlay":"オーバーレイ · 推論ではなく手描き","field.cap":"これは入力そのもので、入力を再現した画像ではありません。棚スコアリングのモデルはこのフレームを列、フェイシング、そしてその間の欠品として読み取り、かつて巡回監査員が手作業で出していた遵守スコアに変換します。上の枠は語彙を示すために手で描いたものです。実際に稼働しているシステムはクライアントとのNDAの下にあるため、以下の図は映像の再生ではなく仕組みを説明しています。","what.eyebrow":"[ 私が実際にしていること ]","what.h2":["多くのAIはデモで","終わる。私のAIは","<span class=\"hl\">昼の混雑<\/span>を越える。"],"what.c1.idx":"01 · 見る","what.c1.h3":"現場の部屋で通用するビジョン","what.c1.p":"悪い画角、魚眼の歪み、人の背後を歩く人。そうした条件下での検出、追跡、再同定です。ベンチマーク用の機材ではなく、1基のGPUで95% mAP、25 FPS。","what.c2.idx":"02 · 判断する","what.c2.h3":"根拠を説明できる判断を下すモデル","what.c2.p":"料理を採点し、棚の異常を指摘し、責任者の質問に平易な言葉で答えるビジョン言語モデルとLLMエージェント。ガードレール付きで、答えを鵜呑みにするのではなく議論できるようにします。","what.c3.idx":"03 · 出荷する","what.c3.h3":"地味なほうの半分","what.c3.p":"マイクロサービス、認証、ロールベースのアクセス制御、ロールバック付きのCI/CD、4言語のインターフェース、そして私がいなくてもクライアントが運用できるドキュメント。","plate.img.alt":"営業中のレストランの調理ライン。直火のコンロに鍋が並び、1つはトングで作業中、その奥に提供用の皿が積まれています。","plate.caption":"ソフトウェアが生き抜くべき現場","plate.lede":"ノートブックでは正しく、金曜の12時40分には間違うモデルは、まだ完成していません。以下のシステムはすべて、実際に動く時間帯に合わせて調整しました。遮蔽、蒸気、悪い画角、フレームレートより速く動くスタッフ。","stats.aria":"数字で見る実績","stats.s1":"本番稼働中のシステム","stats.s2":"同じGPU費用での処理性能","stats.s3":"セキュリティレビュー指摘の解消","stats.s4":"ローンチ当日の対応言語数","stats.s5":"単独で納めたクライアントシステム","work.eyebrow":"[ 主な仕事 · フィールドログ ]","work.h2":["本番稼働は12件。","<span class=\"hl\">そのうち4件を<\/span>","<span class=\"hl\">詳しく。<\/span>"],"work.tally":"<b>全部で12件:<\/b> DFloで4件、Viettel Solutionsで1件、Rainscalesで1件、中小企業向けに単独で6件。以下の4件はいずれも、検証できる数字か開けるリポジトリを伴っています。","work.reel.note":"スクロールまたは選択","work.c1.who":"Viettel Solutions · 2023〜25年","work.c1.viz":"図: 商品フェイシングが並ぶ棚3段。1つのフェイシングがビジョンモデルに囲まれ採点されています","work.c1.h3":"TesselAI · 小売棚のスコアリング","work.c1.p":"機会を見つけ、事業計画を書き、そのまま構築してリリースしました。市場の写真を自動で採点し、手作業の巡回監査レビューを不要にするコンピュータビジョンです。","work.c1.out":"TP95で<strong>120<\/strong> RPS · 商用稼働中 · 同一GPUで約3×","work.c1.aria":"TesselAI(小売棚のスコアリング)のリポジトリ閲覧を申請する","work.c2.who":"DFlo · 2025年〜現在","work.c2.viz":"図: 単一のAPIゲートウェイの背後に6つのサービス","work.c2.h3":"Sauron · 飲食店オペレーションAI","work.c2.p":"1つのゲートウェイの背後に6サービス。リアルタイムの卓稼働状況、動線ヒートマップ、食品品質の自動チェック、そして履歴からオペレーションの質問に答えるチャットエージェント。主開発者です。","work.c2.out":"<strong>399<\/strong>コミット · ローンチ時にEN / VI / JA / ZH対応","work.c2.aria":"Sauron(飲食店オペレーションAI)のリポジトリ閲覧を申請する","work.c3.who":"Rainscales · 2025年","work.c3.viz":"図: 魚眼カメラがフロアを捉え、挙手のジェスチャーを検出しています","work.c3.h3":"カジノフロアのインテリジェンス","work.c3.p":"以前の試みが失敗したカメラ設置条件下で、顧客とスタッフの2クラスを検出。加えてジェスチャー認識により、手を挙げた客のもとへフロアスタッフを向かわせます。","work.c3.out":"1基のGPUで約25 FPS、<strong>95%<\/strong> mAP","work.c3.aria":"カジノフロアのインテリジェンスのリポジトリ閲覧を申請する","work.c4.who":"オープンソース","work.c4.viz":"図: 複数GPUの学習パイプラインを通る画像間変換","work.c4.h3":"PyTorch AnimeGANとツール類","work.c4.p":"広く使われている画像生成プロジェクトでの学習安定化と複数GPU対応。加えて言語モデル向けのVRAM計算ツールと、原理から実装したチェスエンジン。","work.c4.out":"PyTorch AnimeGANで<strong>188★<\/strong>のスター","work.c4.aria":"GitHubでソースを開く(新しいタブで開きます)","work.cta.request":"リポジトリ閲覧を申請","work.cta.requestShort":"閲覧を申請","work.cta.open":"GitHubで開く","work.note.nda":"メール · 相互NDA · 2営業日以内に返信","work.note.public":"公開 · 申請不要","also.label":"その他の実績","also.i1.who":"Golden Gate Group · 2025年","also.i1.h3":"KichiKichiのベルト皿カウント","also.i1.p":"ベルトを流れる皿をカテゴリ別に全数カウント。2台のカメラで、ベルト番号のOCRと店長向けのリアルタイムダッシュボード付き。全国チェーンで稼働中です。","also.i1.aria":"KichiKichiのベルト皿カウントのリポジトリ閲覧を申請する","also.i2.who":"独立 · 2026年","also.i2.h3":"財務分析プラットフォーム","also.i2.p":"雑然としたクライアントのワークブックを構造化テーブルへ突合。システムが提案し、人が確定します。セキュリティレビューの101件の指摘を3回のリリースで解消しました。","also.i2.aria":"財務分析プラットフォームのリポジトリ閲覧を申請する","also.i3.who":"独立 · 2026年","also.i3.h3":"多店舗オペレーションプラットフォーム","also.i3.p":"家電修理チェーン全体を1つのシステムに統合し、表計算を置き換えました。店舗単位のデータ分離はアクセストークン内で強制し、21の業務リソースが稼働中です。","also.i3.aria":"多店舗オペレーションプラットフォームのリポジトリ閲覧を申請する","band.p":"誰も写真に撮らない部分","band.b":"カメラは安い。<br>答えを説明できることは安くない。","method.eyebrow":"[ 仕事の進め方 ]","method.h2":["モデルを自分に","<span class=\"hl\">同意させる<\/span>のは","誰でもできる。"],"method.lede":"仕事は、監査できるものを作ることです。","method.a.h3":"自動化が提案し、人が承認する","method.a.p":"システムが推論した内容は、人が確認するまで事実として扱いません。","method.b.h3":"黙って失敗しない","method.b.p":"デッドレターキューと診断可能なエラー。評価の失敗は常に可視で、復旧できます。","method.c.h3":"ごまかさないテストゲート","method.c.p":"実データが無いときは合格ではなくスキップする精度チェック。誤った安心は、何も無いより悪いからです。","method.d.h3":"設計段階からのアクセス制御","method.d.p":"分離はトークン内で強制し、応答は最小権限、重要な操作には権限チェックを。","method.e.h3":"戻せるリリース","method.e.p":"自動ロールバック付きの継続的デリバリーと、特定の人に連絡が付くことに依存しないためのランブック。","method.f.h3":"引き継ぎも成果物","method.f.p":"アーキテクチャと運用のドキュメントは、コードの後ではなくコードと並行して書きます。","stack.eyebrow":"[ 使っている技術 ]","stack.h2":["技術スタックを","率直に開示。","<span class=\"hl\">適合をご確認ください。<\/span>"],"stack.lede":"以下はすべて、出荷したシステムの中にあるものです。講座の修了証の上にあるものではありません。","stack.g1.h3":"ビジョンとモデル","stack.g1.items":"YOLO11 · YOLOX · OpenCV · 人物再同定と追跡 · 魚眼キャリブレーション · 深度推定 · PyTorch · TensorFlow · ONNX · Triton","stack.g2.h3":"言語とエージェント","stack.g2.items":"Gemini のビジョン言語モデル · ガードレール付きLLMエージェント(Agno、LangChain)· 検索拡張生成 · 音声認識 · 会話メモリ","stack.g3.h3":"バックエンドとデータ","stack.g3.items":"Python(FastAPI、Celery、Flask)· TypeScript(NestJS、Express)· Go · PostgreSQL · MongoDB · Redis · ベクトルデータベース · PySpark · Pandas · Power BI","stack.g4.h3":"インターフェース","stack.g4.items":"Next.js · React · TypeScript · Tailwind · 多言語配信(EN / VI / JA / ZH)· アクセシビリティ改善 · 自動テスト","stack.g5.h3":"クラウドと運用","stack.g5.items":"Google Cloud · Microsoft Azure(Container Apps、Infrastructure as Code)· Docker · 自動ロールバック付きCI/CD · セルフホストランナー · 安全なリバースプロキシとトンネル接続","track.eyebrow":"[ これまでの経歴 ]","track.aria":"職務経歴","track.r1.when":"2025年7月〜現在","track.r1.h3":"AIエンジニア · DFlo","track.r1.p":"Sauronの主開発者。ほかにGolden Gate向けのベルトコンベア皿カウント、24h+の映像ライブラリを扱う映像インテリジェンス基盤、そしてInfrastructure as CodeでAzureに展開した会議インテリジェンスを納めました。","track.r2.when":"2024年11月〜2026年8月","track.r2.h3":"独立での受託開発 · 範囲確定契約","track.r2.p":"ベトナムの中小企業向けに、本番稼働する業務システム6件を単独で納品。要件定義からセキュリティレビュー、デプロイ、引き継ぎまで、社内にIT部門を持たないクライアントに対して。","track.r3.when":"2025年2月〜6月","track.r3.h3":"AIエンジニア · Rainscales(契約)","track.r3.p":"カジノフロアの検出とジェスチャー認識。加えてLinfox向けに、深度推定から導出した倉庫レイアウトのルール判定。","track.r4.when":"2023年6月〜2025年1月","track.r4.h3":"AIエンジニア · Viettel Solutions","track.r4.p":"TesselAIを社内提案から本番稼働する商用製品へ。加えてハードウェアを変えずに推論スループットを約3×改善しました。","close.eyebrow":"[ ご連絡 ]","close.h2":["カメラと課題が","あるなら、私には","<span class=\"hl\">出荷実績。<\/span>"],"close.lede":"一緒に働く方法は3つあります。フルタイムでの参画、承認ゲートを設けてフェーズ分割で納める範囲確定の受託、または貴社チームに入る技術リード。ハノイ転居またはリモート可。","close.cta.start":"話をはじめる","close.reply":"カメラと課題を教えてください。2営業日以内に返信し、相互NDAの下でプライベートリポジトリをレビュー用に開きます。","close.portrait.caption":"Le Nguyen Thanh Ha · ホーチミン市","close.portrait.alt":"ホーチミン市の屋外で撮影されたLe Nguyen Thanh Ha。","close.said":"本番稼働のシステム12件。うち6件は要件定義から引き継ぎまで一人で、残りはチーム内の主開発者として。<b>ポートフォリオよりリポジトリをお見せしたい。<\/b>言っていただければ開きます。","close.spoken":"ベトナム語(母語)· 英語(実務レベル)。このページを4言語で公開しているのは、製品を4言語で出しているのと同じ理由です。","close.linksLabel":"直接の連絡先","close.copy":"コピー","close.copied":"コピー済み","close.copy.aria":"メールアドレスをコピーする","footer.role":"Le Nguyen Thanh Ha · AIプロダクトエンジニア","footer.verify":"797コミット · レビュー済みプルリクエスト75件 · GitHubで検証 ↗","ticker.pause":"停止","ticker.play":"再生","ticker.pause.aria":"ツールとスキルのスクロール表示を停止する","ticker.play.aria":"ツールとスキルのスクロール表示を再開する","ticker.items":["コンピュータビジョン","YOLO11 + ReID","ビジョン言語による品質管理","マルチカメラ追跡","FastAPI · NestJS","エージェント型分析","Triton · ONNX","自動ロールバック"],"cv.fallback.label":"CVはメールでご請求ください","cv.fallback.meta":"返信でPDFを送付、通常は当日中","guide.s1":"ここから。棚を採点するモデルが読む入力で、枠がその語彙です。要点は随時お伝えします。不要ならいつでも閉じられます。","guide.s2":"私の仕事は3つ、システムが動く順に。見る、判断する、出荷する。形容詞ではなく数字をご覧ください。","guide.s3":"数字は5つ。いずれも検証可能で、その方法はこの下でお見せします。","guide.s4":"ここが根拠です。4件を詳しく—画面が広ければ横スクロールします。各カードの末尾は検証できる数字です。","guide.s5":"仕事の統制方法です。経理や監査が必ず尋ね、多くのAIポートフォリオが省く部分です。","guide.s6":"技術スタックを一覧で明記。特定の技術をお探しなら、検索はこの節でどうぞ。","guide.s7":"どこで、いつ。3年間で4つの職務、新しい順に並べています。","guide.off":"ガイドツアーを終了する","guide.on":"ガイドツアーを再開する","guide.on.label":"?","tag.yolo":"1回の推論でフレーム内のすべての枠を返す物体検出です。ライブ映像に間に合う速さです。","tag.seg":"枠ではなく画素単位の輪郭です。手前のフェイシングと奥のフェイシングを切り分けます。","tag.triton":"NVIDIAの推論サーバーです。GPU上でリクエストをまとめ、1つのモデルで多数の呼び出しに応えます。","tag.onnx":"持ち運べるモデル形式です。1つのフレームワークで学習し、どこでも動かせ、元の実行環境より速いことが多いです。","tag.fastapi":"型付きで自己文書化されるAPIと非同期I/Oのために作られたPythonのWebフレームワークです。","tag.reid":"検出に再同定を加え、柱の裏を通った後も同じ人物に同じIDを付け続けます。","tag.vlm":"ビジョン言語モデルです。画像を見て、その内容についての質問に言葉で答えます。","tag.agno":"エージェントの枠組みです。言語モデルにツールと記憶、そして何を断定してよいかの規則を与えます。","tag.next":"ダッシュボードを支えるReactのフレームワークです。サーバーレンダリング、ルーティング、4言語のビルドを担います。","tag.yolox":"2系統の検出器を、公開データセットではなくクライアント自身の映像で比較評価しました。","tag.fisheye":"天井カメラは直線を歪めます。校正で歪みを戻し、画面上の位置を床の位置として扱えるようにします。","tag.multicam":"3台のカメラに映った1人を、3人ではなく1人として数えます。","tag.pytorch":"このプロジェクトが学習に使うフレームワークで、ビジョン研究の多くもこれで公開されます。","tag.tf":"元の実装が使っていたフレームワークです。この仕事では両方の経路を動く状態で維持しています。","tag.rl":"正解ラベルではなく報酬から学ぶ方法で、チェスエンジンの土台になっています。","metric.c1":"TP95は、リクエストの95%がこれより速く完了したという意味です。平均ではなく、利用者が実際に感じる遅い側を表します。","metric.c2":"このリポジトリで私自身が書いたコミット数です。チーム全体の合計ではありません。","metric.c3":"mAPは平均適合率の平均です。全クラスを通じて検出が正確かつ漏れがないかを、1つの数字で表します。","metric.c4":"この成果が取り込まれた本家オープンソースプロジェクトのスター数です。","work.reel.aria":"主な仕事、4つのシステム"}</script>
-<script type="application/json" id="i18n-zh">{"doc.title":"Le Nguyen Thanh Ha — AI 产品工程师","doc.description":"驻胡志明市的 AI 产品工程师。做能在生产环境跑起来的计算机视觉与 LLM 系统：零售货架评分、餐厅运营、赌场场内智能分析。797 次提交、75 个经评审的拉取请求，均可独立核查。","nav.skip":"跳到正文","nav.aria":"主导航","nav.work":"作品","nav.method":"方法","nav.stack":"技术","nav.contact":"联系","nav.lang":"语言","nav.theme.toLight":"切换到浅色主题","nav.theme.toDark":"切换到深色主题","hail.aria":"通过邮件与我联系","hail.text":"联系我","hail.short":"邮箱","hero.tagline":"[ LE NGUYEN THANH HA · AI 产品工程师 ]","hero.h1":["我教机器","<span class=\"hl\">观察、判断<\/span>","并汇报结果。"],"hero.thesis":"把摄像头对准一个真实的业务问题，我就能把它变成<b>能把成本赚回来<\/b>的软件：模型、后端、基础设施，以及店长真的会打开的那个界面。","hero.cta.work":"查看作品","hero.cta.cv":"下载简历","hero.dlmeta":"PDF · 270 KB · 更新于 2026 年 9 月","hero.scroll":"滚动","hero.meta.now.k":"现在","hero.meta.now.v":"DFlo AI 工程师，2025 年 7 月至今 · 3 年生产级 AI 交付经验","hero.meta.based.k":"常驻","hero.meta.based.v":"胡志明市 · 可迁往河内或远程","hero.meta.open.k":"可接受","hero.meta.open.v":"全职或固定范围合同 · 可立即到岗","field.eyebrow":"[ 软件看到了什么 ]","field.img.alt":"正面拍摄的超市货道：三层货架陈列着日用品排面，其中一处因售空而留下缺口。","field.svg.alt":"同一货架上叠加了四处检测框：一排六个商品排面、一个单独排面、一个 SKU 区块，以及一处货架售空后的缺口。","field.hud.source":"来源 · CC0 货架照片","field.hud.det":"检测 · <b>4<\/b>","field.hud.classes":"类别 · 货架、排面、缺口","field.hud.overlay":"叠加层 · 手工绘制，非推理结果","field.cap":"这是真实输入，不是它的效果图。货架评分模型把这一帧读成货架层、商品排面和两者之间的缺口，再换算成过去由现场稽核员手工给出的合规分数。上面的框是手工画的，用来说明这套词汇。真正产出这些框的线上系统受客户 NDA 约束，所以下文的示意图讲的是机制，而不是回放画面。","what.eyebrow":"[ 我具体做什么 ]","what.h2":["多数 AI 止步于演示，","我做的系统","能扛过<span class=\"hl\">午市高峰。<\/span>"],"what.c1.idx":"01 · 看见","what.c1.h3":"在真实现场站得住的视觉","what.c1.p":"在糟糕机位、鱼眼畸变和人群相互遮挡的条件下做检测、跟踪和重识别。单块 GPU 上 25 FPS 达到 95% mAP，不是跑分机器。","what.c2.idx":"02 · 判断","what.c2.h3":"结论站得住脚的模型","what.c2.p":"视觉语言模型和带护栏的 LLM 智能体：给一道菜打分、标出有问题的货架，或用日常语言回答店长的提问。这样的答案可以被追问，而不是只能被相信。","what.c3.idx":"03 · 交付","what.c3.h3":"这份工作不光鲜的另一半","what.c3.p":"微服务、认证、基于角色的权限控制、带回滚的 CI/CD、四语言界面，以及我不在场客户也能照着跑起来的文档。","plate.img.alt":"营业中的餐厅炉线：明火灶上架着几只锅，其中一只正被夹子翻动，后面叠着待上的餐盘。","plate.caption":"软件必须扛住的现场","plate.lede":"在 notebook 里正确、周五 12:40 却出错的模型，等于还没做出来。下面每一套系统都是对着它真正运行的那个时段调出来的：遮挡、水汽、糟糕机位，以及动作比帧率还快的员工。","stats.aria":"用数字呈现的履历","stats.s1":"已投产的系统","stats.s2":"同等 GPU 成本下的吞吐","stats.s3":"已关闭的安全审查问题","stats.s4":"上线首日支持的语言","stats.s5":"独立交付的客户系统","work.eyebrow":"[ 精选项目 · 现场记录 ]","work.h2":["十二套系统在线运行。","<span class=\"hl\">其中四套<\/span>","<span class=\"hl\">详细展开。<\/span>"],"work.tally":"<b>一共十二套：<\/b>DFlo 四套、Viettel Solutions 一套、Rainscales 一套，另有六套为中小企业独立交付。下面这四套，每一套都附带一个可核查的数字，或一个可打开的代码仓库。","work.reel.note":"滚动或点选","work.c1.who":"Viettel Solutions · 2023–25","work.c1.viz":"示意图：三层货架上的商品排面，其中一个排面被框出并由视觉模型给出评分","work.c1.h3":"TesselAI · 零售货架评分","work.c1.p":"机会是我发现的，商业方案是我写的，系统也是我建成并发布的：用计算机视觉自动为卖场照片打分，取代人工现场稽核复核。","work.c1.out":"TP95 下 <strong>120<\/strong> RPS · 已投入商用 · 同等 GPU 下约 3×","work.c1.aria":"申请 TesselAI 零售货架评分项目的代码仓库访问权限","work.c2.who":"DFlo · 2025 至今","work.c2.viz":"示意图：单个 API 网关背后的六个服务","work.c2.h3":"Sauron · 餐厅运营 AI","work.c2.p":"单一网关背后的六个服务：实时餐桌占用、动线热力图、自动化食品质检，以及一个从历史数据回答运营问题的对话智能体。我是主要作者。","work.c2.out":"<strong>399<\/strong> 次提交 · 上线即支持 EN / VI / JA / ZH","work.c2.aria":"申请 Sauron 餐厅运营 AI 项目的代码仓库访问权限","work.c3.who":"Rainscales · 2025","work.c3.viz":"示意图：鱼眼摄像头覆盖的场内区域，其中一个举手手势被识别","work.c3.h3":"赌场场内智能分析","work.c3.p":"在此前方案都失效的机位下，稳定区分顾客与员工两个类别，并加上手势识别，让场内员工被派往举手的客人。","work.c3.out":"单块 GPU 上约 25 FPS，<strong>95%<\/strong> mAP","work.c3.aria":"申请赌场场内智能分析项目的代码仓库访问权限","work.c4.who":"开源","work.c4.viz":"示意图：在多 GPU 训练流水线上完成的图像到图像转换","work.c4.h3":"PyTorch AnimeGAN 与配套工具","work.c4.p":"为一个被广泛使用的图像生成项目做训练稳定性改进和多 GPU 支持；另有一个面向语言模型负载的显存计算器，以及一个从零实现的国际象棋引擎。","work.c4.out":"PyTorch AnimeGAN 获 <strong>188★<\/strong> 星标","work.c4.aria":"在 GitHub 上打开源码（在新标签页中打开）","work.cta.request":"申请仓库访问","work.cta.requestShort":"申请访问","work.cta.open":"在 GitHub 打开","work.note.nda":"邮件 · 双方 NDA · 两个工作日内回复","work.note.public":"公开 · 无需申请","also.label":"其他已交付","also.i1.who":"Golden Gate Group · 2025","also.i1.h3":"KichiKichi 传送带计数","also.i1.p":"每一盘菜在传送带上经过时按品类计数，覆盖两台摄像头，配合传送带编号 OCR 和门店经理的实时看板。已在一家全国连锁餐厅上线运行。","also.i1.aria":"申请 KichiKichi 传送带计数项目的代码仓库访问权限","also.i2.who":"独立承接 · 2026","also.i2.h3":"财务分析平台","also.i2.p":"把客户杂乱的表格对账成结构化数据表；系统提出结果，由人确认。三个版本中关闭了安全审查提出的 101 个问题。","also.i2.aria":"申请财务分析平台项目的代码仓库访问权限","also.i3.who":"独立承接 · 2026","also.i3.h3":"多门店运营平台","also.i3.p":"一套系统覆盖整个家电维修连锁，取代原有电子表格。门店级数据隔离在访问令牌内强制执行；21 类业务资源已上线。","also.i3.aria":"申请多门店运营平台项目的代码仓库访问权限","band.p":"没人会拍下来的那部分","band.b":"摄像头很便宜。<br>能为答案负责并不便宜。","method.eyebrow":"[ 我怎么做事 ]","method.h2":["谁都能让模型","<span class=\"hl\">迎合<\/span>","自己的结论。"],"method.lede":"真正的工作，是做出能被审计的东西。","method.a.h3":"自动化提出建议，由人确认","method.a.p":"系统推断出的任何结果，在有人确认之前都不当作事实。","method.b.h3":"不容许静默失败","method.b.p":"死信队列和可诊断的错误。失败的评估始终可见、可恢复。","method.c.h3":"诚实的测试门禁","method.c.p":"缺少真实验证数据时，准确率检查会跳过，而不是判为通过。虚假的把握比没有把握更糟。","method.d.h3":"权限控制内建于设计","method.d.p":"隔离在令牌中强制执行，响应遵循最小权限，关键操作逐一设权限。","method.e.h3":"可回退的发布","method.e.p":"持续交付配自动回滚，并配有运行手册，任何环节都不依赖某一个人随时在线。","method.f.h3":"交接本身就是交付物","method.f.p":"架构文档与运维文档和代码同步写成，而不是事后补。","stack.eyebrow":"[ 我用什么构建 ]","stack.h2":["技术栈如实列出，","方便你直接","<span class=\"hl\">核对匹配度。<\/span>"],"stack.lede":"下面每一项都用在已上线的系统里，而不是写在课程证书上。","stack.g1.h3":"视觉与模型","stack.g1.items":"YOLO11 · YOLOX · OpenCV · 行人重识别与跟踪 · 鱼眼标定 · 深度估计 · PyTorch · TensorFlow · ONNX · Triton","stack.g2.h3":"语言与智能体","stack.g2.items":"Gemini 视觉语言模型 · 带护栏的 LLM 智能体（Agno、LangChain） · 检索增强生成 · 语音识别 · 对话记忆","stack.g3.h3":"后端与数据","stack.g3.items":"Python（FastAPI、Celery、Flask） · TypeScript（NestJS、Express） · Go · PostgreSQL · MongoDB · Redis · 向量数据库 · PySpark · Pandas · Power BI","stack.g4.h3":"界面","stack.g4.items":"Next.js · React · TypeScript · Tailwind · 多语言交付（EN / VI / JA / ZH） · 无障碍整改 · 自动化测试","stack.g5.h3":"云与运维","stack.g5.items":"Google Cloud · Microsoft Azure（Container Apps、基础设施即代码） · Docker · 带自动回滚的 CI/CD · 自托管 runner · 安全反向代理与隧道访问","track.eyebrow":"[ 履历记录 ]","track.aria":"工作经历","track.r1.when":"2025 年 7 月至今","track.r1.h3":"AI 工程师 · DFlo","track.r1.p":"Sauron 的主要作者。还为 Golden Gate 交付了传送带菜品计数、一个处理 24h+ 视频库的视频智能平台，以及用基础设施即代码部署到 Azure 的会议智能系统。","track.r2.when":"2024 年 11 月 – 2026 年 8 月","track.r2.h3":"独立交付 · 固定范围合同","track.r2.p":"为越南中小企业独立交付六套生产级业务系统：从需求、安全审查到部署与交接，客户均无内部 IT 团队。","track.r3.when":"2025 年 2 月 – 6 月","track.r3.h3":"AI 工程师 · Rainscales（合同制）","track.r3.p":"赌场场内检测与手势识别；基于深度估计为 Linfox 推导仓库布局规则。","track.r4.when":"2023 年 6 月 – 2025 年 1 月","track.r4.h3":"AI 工程师 · Viettel Solutions","track.r4.p":"把 TesselAI 从内部提案做成投入生产的商用产品，并在硬件不变的前提下把推理吞吐提升约 3×。","close.eyebrow":"[ 取得联系 ]","close.h2":["你有摄像头","和一个问题，","我有<span class=\"hl\">交付记录。<\/span>"],"close.lede":"三种合作方式：全职岗位；按阶段交付、设验收节点的固定范围项目合同；或作为技术负责人嵌入你自己的团队。可迁往河内或远程。","close.cta.start":"开始沟通","close.reply":"告诉我摄像头和问题。我会在两个工作日内回复；在双方 NDA 下，私有仓库可开放给你审阅。","close.portrait.caption":"Le Nguyen Thanh Ha · 胡志明市","close.portrait.alt":"Le Nguyen Thanh Ha 在胡志明市户外拍摄的照片。","close.said":"十二套生产系统，其中六套从需求到交接由我独立完成，其余由我在团队中作为主要作者完成。<b>我更愿意给你看代码仓库，而不是作品集。<\/b>开口就好，我会打开一个。","close.spoken":"越南语（母语） · 英语（专业工作水平）。这个页面用四种语言发布，理由和产品一样。","close.linksLabel":"或者直接联系我","close.copy":"复制","close.copied":"已复制","close.copy.aria":"复制邮箱地址","footer.role":"Le Nguyen Thanh Ha · AI 产品工程师","footer.verify":"797 次提交 · 75 个经评审的拉取请求 · 在 GitHub 上核查 ↗","ticker.pause":"暂停","ticker.play":"播放","ticker.pause.aria":"暂停工具与技能的滚动列表","ticker.play.aria":"继续播放工具与技能的滚动列表","ticker.items":["计算机视觉","YOLO11 + ReID","视觉语言质检","多摄像头跟踪","FastAPI · NestJS","智能体分析","Triton · ONNX","自动回滚"],"cv.fallback.label":"发邮件索取简历","cv.fallback.meta":"PDF 由回信附上，通常当天发出","guide.s1":"从这里开始。这是货架模型读取的输入，框就是它的词汇表。往下我会标出关键处；随时可以关掉我。","guide.s2":"我做三件事，顺序和系统一样：看见、判断、交付。看数字，别看形容词。","guide.s3":"五个数字。每一个都可核查，再往下我会告诉你怎么查。","guide.s4":"证据在这里。四套系统详细展开——宽屏下这组卡片横向滚动。每张卡都以一个可核查的数字收尾。","guide.s5":"工作如何被治理。这是财务或审计团队会问的部分，也是多数 AI 作品集跳过的部分。","guide.s6":"技术栈，如实列成清单。在找某一项具体技术？就搜这一节。","guide.s7":"地点与时间：三年里的四段任职，最近的排在最前。","guide.off":"关闭引导导览","guide.on":"重新开启引导导览","guide.on.label":"?","tag.yolo":"单次前向就完成的目标检测器：看一帧画面即返回其中所有的框，快到能跟上实时视频。","tag.seg":"给出像素级轮廓而不是方框——这才分得清前排商品和它后面那一排。","tag.triton":"NVIDIA 的推理服务器。它在 GPU 上把请求合成批次，让一个模型同时服务许多调用方。","tag.onnx":"一种可移植的模型格式：在一个框架里训练，换到哪里都能跑，通常还比原生运行时更快。","tag.fastapi":"一个 Python Web 框架，为带类型标注、自带接口文档的 API 和异步 I/O 而生。","tag.reid":"检测加行人重识别：同一个人从柱子后面走出来，身上的 ID 还是原来那个。","tag.vlm":"视觉语言模型。它看一张图，然后用文字回答关于这张图的问题。","tag.agno":"一个智能体框架：给语言模型配上工具、记忆，以及关于它能断言什么的规则。","tag.next":"看板背后的 React 框架——负责服务端渲染、路由，以及四语言构建。","tag.yolox":"两个检测器家族，在客户自己的录像上相互对比，而不是在公开数据集上。","tag.fisheye":"吊顶摄像头会把直线拍弯。标定消除这种畸变，让画面上的位置对应地面上的位置。","tag.multicam":"被三台摄像头同时看到的一个人，只计一次，不是三次。","tag.pytorch":"本项目用来训练的框架，也是多数视觉研究发布代码时用的那个。","tag.tf":"原始实现所用的框架；这项工作让两条路径都继续可用。","tag.rl":"从奖励里学，而不是从标好的答案里学——国际象棋引擎用的就是这个方法。","metric.c1":"TP95 表示 95% 的请求都比这个时间更快。它说的是慢尾部，也就是用户真正感受到的部分，而不是平均值。","metric.c2":"这个仓库里由我本人提交的次数，不是整个团队的总数。","metric.c3":"mAP 是平均精度均值：用一个数字衡量检测器在每个类别上既判得准、又不漏检的程度。","metric.c4":"这项工作被合入的那个上游开源项目所获得的星标数。","work.reel.aria":"精选项目，四套系统"}</script>
+<script type="application/json" id="i18n-vi">{"doc.title":"Le Nguyen Thanh Ha — Kỹ sư sản phẩm AI","doc.description":"Kỹ sư sản phẩm AI tại Thành phố Hồ Chí Minh. Các hệ thống thị giác máy tính và LLM chạy thật trong môi trường production: chấm điểm quầy kệ bán lẻ, vận hành nhà hàng, giám sát sàn casino. 797 commit qua 75 pull request đã được review, ai cũng có thể tự kiểm chứng.","nav.skip":"Tới nội dung chính","nav.aria":"Điều hướng chính","nav.work":"Dự án","nav.method":"Cách làm","nav.stack":"Công cụ","nav.contact":"Liên hệ","nav.lang":"Ngôn ngữ","nav.theme.toLight":"Chuyển sang giao diện sáng","nav.theme.toDark":"Chuyển sang giao diện tối","hail.aria":"Liên hệ với tôi qua email","hail.text":"Liên hệ","hail.short":"Email","hero.tagline":"[ LE NGUYEN THANH HA · KỸ SƯ SẢN PHẨM AI ]","hero.h1":["Tôi dạy máy móc","<span class=\"hl\">quan sát, đánh giá,<\/span>","và báo cáo."],"hero.thesis":"Hướng một chiếc camera vào một bài toán kinh doanh thật, tôi biến nó thành phần mềm <b>tự thu hồi lại chi phí<\/b>: mô hình, backend, hạ tầng, và cái màn hình mà người quản lý thật sự mở ra xem.","hero.cta.work":"Xem dự án","hero.cta.cv":"Tải CV","hero.dlmeta":"PDF · 270 KB · cập nhật tháng 9 2026","hero.scroll":"Cuộn","hero.meta.now.k":"Hiện tại","hero.meta.now.v":"AI Engineer tại DFlo, từ 7/2025 đến nay · 3 năm đưa AI vào production","hero.meta.based.k":"Nơi ở","hero.meta.based.v":"Thành phố Hồ Chí Minh · sẵn sàng chuyển ra Hà Nội hoặc làm remote","hero.meta.open.k":"Sẵn sàng cho","hero.meta.open.v":"Toàn thời gian hoặc hợp đồng theo phạm vi cố định · nhận việc ngay","field.eyebrow":"[ PHẦN MỀM NHÌN THẤY GÌ ]","field.img.alt":"Một lối đi trong siêu thị được chụp chính diện: ba tầng kệ xếp đầy mặt hàng gia dụng, có một khoảng trống nơi hàng đã bán hết.","field.svg.alt":"Cũng chính kệ hàng đó với bốn vùng nhận diện được vẽ lên: một dãy sáu mặt sản phẩm, một mặt sản phẩm riêng lẻ, một khối mã hàng, và một khoảng trống nơi kệ đã bán hết hàng.","field.hud.source":"Nguồn · ảnh kệ hàng CC0","field.hud.det":"Nhận diện · <b>4<\/b>","field.hud.classes":"Lớp · kệ, mặt hàng, khoảng trống","field.hud.overlay":"Lớp phủ · vẽ tay, không phải suy luận","field.cap":"Đây là dữ liệu đầu vào thật, không phải hình minh họa. Một mô hình chấm điểm quầy kệ đọc khung ảnh này thành các tầng kệ, các mặt hàng và những khoảng trống giữa chúng, rồi quy đổi thành điểm tuân thủ mà trước đây nhân viên kiểm tra thị trường phải tự tính bằng tay. Các khung ở trên được vẽ tay để minh họa bộ từ vựng đó. Những hệ thống đang chạy thật nằm sau các thỏa thuận NDA với khách hàng, nên các sơ đồ bên dưới mô tả cơ chế thay vì chiếu lại hình ảnh thực tế.","what.eyebrow":"[ TÔI THỰC SỰ LÀM GÌ ]","what.h2":["Hầu hết AI dừng lại","ở bản demo. Của tôi","trụ được <span class=\"hl\">giờ cao điểm.<\/span>"],"what.c1.idx":"01 · NHÌN","what.c1.h3":"Thị giác trụ được trong một căn phòng thật","what.c1.p":"Nhận diện, theo vết và tái định danh dưới những góc camera xấu, ảnh méo fisheye và những người đi che lẫn nhau. 95% mAP ở 25 FPS trên một GPU, không phải trên dàn máy đo benchmark.","what.c2.idx":"02 · PHÁN ĐỊNH","what.c2.h3":"Mô hình đưa ra kết luận bảo vệ được","what.c2.p":"Các mô hình thị giác - ngôn ngữ và agent LLM có guardrail, chấm điểm một món ăn, gắn cờ một kệ hàng, hoặc trả lời câu hỏi của người quản lý bằng ngôn ngữ thường ngày, để câu trả lời có thể đem ra tranh luận chứ không chỉ để tin.","what.c3.idx":"03 · GIAO HÀNG","what.c3.h3":"Nửa công việc không hào nhoáng","what.c3.p":"Microservice, xác thực, phân quyền theo vai trò, CI/CD có rollback, giao diện bốn ngôn ngữ, và tài liệu để khách hàng tự vận hành khi tôi không còn ở đó.","plate.img.alt":"Một dây bếp nhà hàng giữa giờ phục vụ: các chảo trên bếp lửa hở, một chảo đang được đảo bằng kẹp gắp, phía sau là các đĩa phục vụ xếp chồng.","plate.caption":"Căn phòng mà phần mềm phải trụ được","plate.lede":"Một mô hình đúng trong notebook nhưng sai vào 12:40 trưa thứ Sáu thì coi như chưa được làm xong. Mọi hệ thống bên dưới đều được tinh chỉnh đúng theo cái giờ mà nó thực sự chạy: vật che, khói bếp, góc camera xấu, nhân viên di chuyển nhanh hơn cả tốc độ khung hình.","stats.aria":"Thành tích thể hiện bằng số liệu","stats.s1":"Hệ thống đang chạy production","stats.s2":"Thông lượng trên cùng một mức chi phí GPU","stats.s3":"Phát hiện từ đợt review bảo mật đã xử lý xong","stats.s4":"Số ngôn ngữ có ngay ngày ra mắt","stats.s5":"Hệ thống khách hàng tự làm một mình","work.eyebrow":"[ DỰ ÁN CHỌN LỌC · SỔ TAY THỰC ĐỊA ]","work.h2":["Mười hai hệ thống","đang vận hành. <span class=\"hl\">Bốn<\/span>","<span class=\"hl\">được kể chi tiết.<\/span>"],"work.tally":"<b>Tổng cộng mười hai:<\/b> bốn tại DFlo, một tại Viettel Solutions, một tại Rainscales, sáu hệ thống tự làm một mình cho các doanh nghiệp vừa và nhỏ. Bốn dự án dưới đây, mỗi dự án đều kèm một con số bạn kiểm chứng được hoặc một repository bạn mở ra xem được.","work.c1.who":"Viettel Solutions · 2023–25","work.c1.viz":"Sơ đồ: ba tầng kệ xếp mặt hàng, một mặt hàng được khoanh vùng và chấm điểm bởi mô hình thị giác","work.c1.h3":"TesselAI · chấm điểm quầy kệ bán lẻ","work.c1.p":"Tôi tìm ra cơ hội, viết business case, rồi tự xây và phát hành: thị giác máy tính chấm điểm ảnh chụp thị trường một cách tự động và xóa bỏ khâu rà soát kiểm tra thủ công tại điểm bán.","work.c1.out":"<strong>120<\/strong> RPS tại TP95 · đang dùng thương mại · ~3× trên cùng một GPU","work.c1.aria":"Xin quyền truy cập repository của TesselAI, hệ thống chấm điểm quầy kệ bán lẻ","work.c2.who":"DFlo · 2025–nay","work.c2.viz":"Sơ đồ: sáu service nằm sau một API gateway duy nhất","work.c2.h3":"Sauron · AI vận hành nhà hàng","work.c2.p":"Sáu service sau một gateway: theo dõi bàn trống theo thời gian thực, bản đồ nhiệt luồng di chuyển, kiểm soát chất lượng món ăn tự động, và một chat agent trả lời câu hỏi vận hành dựa trên dữ liệu lịch sử. Tôi là tác giả chính.","work.c2.out":"<strong>399<\/strong> commit · EN / VI / JA / ZH ngay khi ra mắt","work.c2.aria":"Xin quyền truy cập repository của Sauron, hệ thống AI vận hành nhà hàng","work.c3.who":"Rainscales · 2025","work.c3.viz":"Sơ đồ: vùng phủ của camera fisheye trên một sàn, với một động tác giơ tay được nhận diện","work.c3.h3":"Giám sát thông minh sàn casino","work.c3.p":"Hai lớp đối tượng — khách và nhân viên — được nhận diện dưới những vị trí đặt camera đã làm các lần thử trước thất bại, cộng thêm nhận diện động tác để nhân viên sàn được điều tới đúng khách đang giơ tay.","work.c3.out":"<strong>95%<\/strong> mAP ở ~25 FPS trên một GPU","work.c3.aria":"Xin quyền truy cập repository của hệ thống giám sát thông minh sàn casino","work.c4.who":"Mã nguồn mở","work.c4.viz":"Sơ đồ: chuyển đổi ảnh sang ảnh trên một pipeline huấn luyện đa GPU","work.c4.h3":"PyTorch AnimeGAN và bộ công cụ","work.c4.p":"Cải thiện độ ổn định khi huấn luyện và hỗ trợ đa GPU cho một dự án sinh ảnh được dùng rộng rãi; cùng với một công cụ tính VRAM cho tác vụ mô hình ngôn ngữ và một engine chơi cờ viết từ đầu.","work.c4.out":"<strong>188★<\/strong> sao trên PyTorch AnimeGAN","work.c4.aria":"Mở trên GitHub, mã nguồn PyTorch AnimeGAN và công cụ (mở trong tab mới)","work.cta.request":"Xin quyền truy cập repository","work.cta.requestShort":"Xin truy cập","work.cta.open":"Mở trên GitHub","work.note.nda":"Email · NDA hai chiều · phản hồi trong hai ngày làm việc","work.note.public":"Công khai · không cần xin quyền","also.label":"Các hệ thống khác đã giao","also.i1.who":"Golden Gate Group · 2025","also.i1.h3":"Đếm món trên băng chuyền KichiKichi","also.i1.p":"Từng món ăn được đếm theo nhóm khi đi qua băng chuyền, trên hai camera, kèm OCR số băng và một dashboard theo thời gian thực cho quản lý cửa hàng. Đang chạy thật trong một chuỗi nhà hàng toàn quốc.","also.i1.aria":"Xin truy cập repository của hệ thống đếm món trên băng chuyền KichiKichi","also.i2.who":"Làm độc lập · 2026","also.i2.h3":"Nền tảng phân tích tài chính","also.i2.p":"Các bảng tính rối rắm của khách hàng được đối soát thành bảng dữ liệu có cấu trúc; hệ thống đề xuất, con người xác nhận. 101 phát hiện từ đợt review bảo mật đã được xử lý xong qua ba bản phát hành.","also.i2.aria":"Xin truy cập repository của nền tảng phân tích tài chính","also.i3.who":"Làm độc lập · 2026","also.i3.h3":"Nền tảng vận hành nhiều chi nhánh","also.i3.p":"Một hệ thống duy nhất cho cả chuỗi sửa chữa điện máy, thay thế các bảng tính. Việc phân tách dữ liệu theo chi nhánh được cưỡng chế ngay trong access token; 21 nhóm nghiệp vụ đang chạy thật.","also.i3.aria":"Xin truy cập repository của nền tảng vận hành nhiều chi nhánh","band.p":"Phần không ai chụp ảnh","band.b":"Camera thì rẻ.<br>Bảo vệ được câu trả lời thì không.","method.eyebrow":"[ CÁCH TÔI LÀM VIỆC ]","method.h2":["Ai cũng có thể bắt","mô hình <span class=\"hl\">đồng ý<\/span>","với mình."],"method.lede":"Việc cần làm là xây được thứ có thể đem ra kiểm toán.","method.a.h3":"Tự động hóa đề xuất, con người phê duyệt","method.a.p":"Không có suy luận nào của hệ thống được coi là sự thật cho tới khi có người xác nhận.","method.b.h3":"Không có lỗi âm thầm","method.b.p":"Dead-letter queue và các lỗi chẩn đoán được. Một lượt xử lý thất bại luôn hiện ra và luôn khôi phục được.","method.c.h3":"Cổng kiểm thử trung thực","method.c.p":"Các phép kiểm tra độ chính xác sẽ bỏ qua chứ không báo đạt khi thiếu dữ liệu kiểm định thật. Yên tâm giả còn tệ hơn là không yên tâm.","method.d.h3":"Phân quyền ngay từ thiết kế","method.d.p":"Phân tách được cưỡng chế trong token, phản hồi theo nguyên tắc đặc quyền tối thiểu, quyền hạn gắn vào đúng những hành động quan trọng.","method.e.h3":"Phát hành có thể đảo ngược","method.e.p":"Continuous delivery với rollback tự động, và runbook để không việc gì phụ thuộc vào việc liên lạc được với một người duy nhất.","method.f.h3":"Bàn giao cũng là một sản phẩm giao","method.f.p":"Tài liệu kiến trúc và vận hành được viết song song với code, không phải viết sau.","stack.eyebrow":"[ TÔI XÂY BẰNG NHỮNG GÌ ]","stack.h2":["Công cụ tôi dùng,","nói rõ để bạn","<span class=\"hl\">tự đối chiếu.<\/span>"],"stack.lede":"Mọi thứ bên dưới đều nằm trong một hệ thống đã giao thật, không phải trên một tấm chứng chỉ khóa học.","stack.g1.h3":"Thị giác và mô hình","stack.g1.items":"YOLO11 · YOLOX · OpenCV · tái định danh và theo vết người · hiệu chỉnh fisheye · ước lượng độ sâu · PyTorch · TensorFlow · ONNX · Triton","stack.g2.h3":"Ngôn ngữ và agent","stack.g2.items":"Mô hình thị giác - ngôn ngữ Gemini · agent LLM có guardrail (Agno, LangChain) · sinh nội dung tăng cường bằng truy hồi · nhận dạng giọng nói · bộ nhớ hội thoại","stack.g3.h3":"Backend và dữ liệu","stack.g3.items":"Python (FastAPI, Celery, Flask) · TypeScript (NestJS, Express) · Go · PostgreSQL · MongoDB · Redis · cơ sở dữ liệu vector · PySpark · Pandas · Power BI","stack.g4.h3":"Giao diện","stack.g4.items":"Next.js · React · TypeScript · Tailwind · triển khai đa ngôn ngữ (EN / VI / JA / ZH) · khắc phục lỗi trợ năng · kiểm thử tự động","stack.g5.h3":"Cloud và vận hành","stack.g5.items":"Google Cloud · Microsoft Azure (Container Apps, hạ tầng dưới dạng mã) · Docker · CI/CD với rollback tự động · runner tự dựng · reverse proxy bảo mật và truy cập qua tunnel","track.eyebrow":"[ QUÁ TRÌNH LÀM VIỆC ]","track.aria":"Lịch sử công việc","track.r1.when":"7/2025 – nay","track.r1.h3":"AI Engineer · DFlo","track.r1.p":"Tác giả chính của Sauron. Ngoài ra còn giao hệ thống đếm món trên băng chuyền cho Golden Gate, một nền tảng phân tích video xử lý kho tư liệu 24h+, và hệ thống phân tích cuộc họp triển khai lên Azure bằng hạ tầng dưới dạng mã.","track.r2.when":"11/2024 – 8/2026","track.r2.h3":"Hành nghề độc lập · hợp đồng theo phạm vi cố định","track.r2.p":"Sáu hệ thống nghiệp vụ chạy production tự làm một mình cho các doanh nghiệp vừa và nhỏ Việt Nam: từ khảo sát yêu cầu, qua review bảo mật, tới triển khai và bàn giao, cho những khách hàng không có bộ phận IT nội bộ.","track.r3.when":"2 – 6/2025","track.r3.h3":"AI Engineer · Rainscales (hợp đồng)","track.r3.p":"Nhận diện người trên sàn casino và nhận diện động tác; các quy tắc bố trí kho cho Linfox suy ra từ ước lượng độ sâu.","track.r4.when":"6/2023 – 1/2025","track.r4.h3":"AI Engineer · Viettel Solutions","track.r4.p":"Đưa TesselAI từ một đề xuất nội bộ thành sản phẩm thương mại chạy production, và đạt mức tăng ~3× thông lượng suy luận trên phần cứng không đổi.","close.eyebrow":"[ LIÊN HỆ ]","close.h2":["Bạn có camera và","một bài toán, tôi có","<span class=\"hl\">hồ sơ triển khai.<\/span>"],"close.lede":"Ba cách để làm việc cùng tôi: một vị trí toàn thời gian, một hợp đồng dự án theo phạm vi cố định giao theo từng giai đoạn có cổng ký xác nhận, hoặc một technical lead làm việc trực tiếp trong đội của bạn. Sẵn sàng chuyển ra Hà Nội hoặc làm remote.","close.cta.start":"Bắt đầu trao đổi","close.reply":"Hãy nói cho tôi biết camera và bài toán. Tôi phản hồi trong hai ngày làm việc, và các repository riêng tư sẽ được mở ra để bạn xem dưới một NDA hai chiều.","close.portrait.caption":"Le Nguyen Thanh Ha · Thành phố Hồ Chí Minh","close.portrait.alt":"Le Nguyen Thanh Ha, ảnh chụp ngoài trời tại Thành phố Hồ Chí Minh.","close.said":"Mười hai hệ thống chạy production, sáu trong số đó tôi tự làm một mình từ khảo sát yêu cầu tới bàn giao, số còn lại tôi là tác giả chính trong một đội. <b>Tôi thà cho bạn xem một repository hơn là một portfolio.<\/b> Bạn cứ hỏi, tôi sẽ mở một cái.","close.spoken":"Tiếng Việt (bản ngữ) · tiếng Anh (thành thạo ở mức làm việc chuyên môn). Trang này được xuất bản bằng bốn ngôn ngữ, vì đúng cái lý do mà các sản phẩm cũng vậy.","close.linksLabel":"Hoặc liên hệ trực tiếp","close.copy":"Sao chép","close.copied":"Đã chép","close.copy.aria":"Sao chép địa chỉ email","footer.role":"Le Nguyen Thanh Ha · Kỹ sư sản phẩm AI","footer.verify":"797 commit · 75 pull request đã review · kiểm chứng trên GitHub ↗","ticker.pause":"Tạm dừng","ticker.play":"Chạy","ticker.pause.aria":"Tạm dừng danh sách công cụ và kỹ năng đang cuộn","ticker.play.aria":"Cho danh sách công cụ và kỹ năng cuộn tiếp","ticker.items":["Thị giác máy tính","YOLO11 + ReID","QC thị giác - ngôn ngữ","Theo vết đa camera","FastAPI · NestJS","Phân tích bằng agent","Triton · ONNX","Rollback tự động"],"cv.fallback.label":"Gửi email cho tôi để nhận CV","cv.fallback.meta":"PDF gửi kèm thư trả lời, thường trong ngày","guide.s1":"Bắt đầu từ đây. Đây là đầu vào mà mô hình kệ hàng đọc — các khung là từ vựng của nó. Tôi sẽ chỉ chỗ quan trọng; tắt tôi lúc nào cũng được.","guide.s2":"Ba việc tôi làm, theo đúng thứ tự một hệ thống làm: nhìn, phán định, giao hàng. Hãy đọc các con số, đừng đọc tính từ.","guide.s3":"Năm con số. Cái nào cũng kiểm chứng được, và xuống dưới tôi chỉ bạn cách làm.","guide.s4":"Phần chứng minh. Bốn hệ thống kể chi tiết — trên màn hình rộng, dải thẻ cuộn ngang. Mỗi thẻ kết lại bằng một con số bạn kiểm chứng được.","guide.s5":"Công việc được kiểm soát ra sao. Đây là phần bộ phận tài chính hay kiểm toán sẽ hỏi, và là phần hầu hết portfolio AI bỏ qua.","guide.s6":"Toàn bộ công cụ, viết ra thành danh sách. Đang tìm một công nghệ cụ thể? Hãy tìm ngay trong mục này.","guide.s7":"Ở đâu và khi nào: bốn vị trí trong ba năm, mới nhất xếp trước.","guide.off":"Tắt phần hướng dẫn xem trang","guide.on":"Bật lại phần hướng dẫn xem trang","guide.on.label":"?","tag.yolo":"Bộ nhận diện vật thể chỉ cần một lượt: một lần nhìn khung ảnh là trả về mọi khung bao tìm được, đủ nhanh cho video trực tiếp.","tag.seg":"Đường viền ở mức từng điểm ảnh thay vì khung bao — đủ để tách mặt hàng phía trước khỏi mặt hàng xếp ngay sau nó.","tag.triton":"Máy chủ suy luận của NVIDIA. Nó gộp các yêu cầu lại trên một GPU để một mô hình phục vụ được nhiều nơi gọi cùng lúc.","tag.onnx":"Một định dạng mô hình mang đi được: huấn luyện ở một framework, chạy ở bất cứ đâu, thường nhanh hơn runtime gốc.","tag.fastapi":"Một web framework Python sinh ra cho các API có kiểu dữ liệu rõ ràng, tự sinh tài liệu, và I/O bất đồng bộ.","tag.reid":"Nhận diện cộng tái định danh: cùng một người vẫn giữ nguyên ID sau khi đi qua phía sau một cây cột.","tag.vlm":"Một mô hình thị giác - ngôn ngữ. Nó xem một tấm ảnh rồi trả lời câu hỏi về tấm ảnh đó bằng lời.","tag.agno":"Một framework agent: mô hình ngôn ngữ được cấp công cụ, bộ nhớ, và quy tắc về những gì nó được phép khẳng định.","tag.next":"Framework React đứng sau dashboard — kết xuất phía server, điều hướng, và bản build bốn ngôn ngữ.","tag.yolox":"Hai dòng mô hình nhận diện, đem đo đối chiếu với nhau trên chính tư liệu của khách hàng chứ không phải trên một bộ dữ liệu công khai.","tag.fisheye":"Camera trần làm đường thẳng bị uốn cong. Hiệu chỉnh khử phần méo đó để một vị trí trên màn hình đúng là một vị trí trên sàn.","tag.multicam":"Một người được ba camera cùng nhìn thấy chỉ được đếm một lần, không phải ba lần.","tag.pytorch":"Framework mà dự án này huấn luyện trên đó, và cũng là nơi phần lớn nghiên cứu thị giác công bố kèm code.","tag.tf":"Framework mà bản cài đặt gốc đã dùng; công việc này giữ cho cả hai đường đều chạy được.","tag.rl":"Học từ phần thưởng thay vì từ đáp án được gán nhãn — phương pháp đứng sau engine chơi cờ.","metric.c1":"TP95 nghĩa là 95% yêu cầu hoàn tất nhanh hơn mức này. Nó nói về nhóm yêu cầu chậm nhất, thứ người dùng thực sự cảm nhận, không phải mức trung bình.","metric.c2":"Số commit do chính tôi viết trong repository này, không phải tổng của cả đội.","metric.c3":"mAP là độ chính xác trung bình bình quân: một con số cho biết mô hình nhận diện vừa đúng vừa không bỏ sót đến mức nào, trên mọi lớp.","metric.c4":"Số sao trên dự án mã nguồn mở gốc mà phần công việc này đã được merge vào.","work.reel.aria":"Dự án chọn lọc, bốn hệ thống","work.reel.prev":"Dự án trước","work.reel.next":"Dự án tiếp theo"}</script>
+<script type="application/json" id="i18n-ja">{"doc.title":"Le Nguyen Thanh Ha — AIプロダクトエンジニア","doc.description":"ホーチミン市在住のAIプロダクトエンジニア。本番環境で動くコンピュータビジョンとLLMシステムを構築しています。小売棚のスコアリング、飲食店オペレーション、カジノフロアのインテリジェンス。797コミット、レビュー済みプルリクエスト75件、いずれも第三者が検証できます。","nav.skip":"本文へ移動","nav.aria":"メインナビゲーション","nav.work":"仕事","nav.method":"手法","nav.stack":"技術","nav.contact":"連絡","nav.lang":"言語","nav.theme.toLight":"ライトテーマに切り替える","nav.theme.toDark":"ダークテーマに切り替える","hail.aria":"ご連絡ください — メールで","hail.text":"ご連絡ください","hail.short":"メール","hero.tagline":"[ LE NGUYEN THANH HA · AIプロダクトエンジニア ]","hero.h1":["機械に教えるのは","<span class=\"hl\">見て、判断し、<\/span>","報告すること。"],"hero.thesis":"現実の業務課題にカメラを向け、それを<b>コストを回収する<\/b>ソフトウェアに変えます。モデル、バックエンド、インフラ、そして現場の責任者が実際に開く画面まで。","hero.cta.work":"実績を見る","hero.cta.cv":"CVをダウンロード","hero.dlmeta":"PDF · 270 KB · 2026年9月更新","hero.scroll":"スクロール","hero.meta.now.k":"現在","hero.meta.now.v":"DFloのAIエンジニア、2025年7月〜現在 · 本番AIを3年間出荷","hero.meta.based.k":"拠点","hero.meta.based.v":"ホーチミン市 · ハノイ転居またはリモート可","hero.meta.open.k":"希望","hero.meta.open.v":"フルタイムまたは範囲確定の受託 · 即日対応可","field.eyebrow":"[ ソフトウェアが見ているもの ]","field.img.alt":"スーパーマーケットの通路を正面から撮影した写真。家庭用品のフェイシングが並ぶ棚が3段あり、売り切れて空いた箇所があります。","field.svg.alt":"同じ棚に4つの検出結果を重ねた図。6個のフェイシングが並ぶ列、単体のフェイシング1つ、在庫管理単位のブロック1つ、そして売り切れて空いた箇所です。","field.hud.source":"出典 · CC0の棚写真","field.hud.det":"検出 · <b>4<\/b>","field.hud.classes":"クラス · 棚、フェイシング、欠品","field.hud.overlay":"オーバーレイ · 推論ではなく手描き","field.cap":"これは入力そのもので、入力を再現した画像ではありません。棚スコアリングのモデルはこのフレームを列、フェイシング、そしてその間の欠品として読み取り、かつて巡回監査員が手作業で出していた遵守スコアに変換します。上の枠は語彙を示すために手で描いたものです。実際に稼働しているシステムはクライアントとのNDAの下にあるため、以下の図は映像の再生ではなく仕組みを説明しています。","what.eyebrow":"[ 私が実際にしていること ]","what.h2":["多くのAIはデモで","終わる。私のAIは","<span class=\"hl\">昼の混雑<\/span>を越える。"],"what.c1.idx":"01 · 見る","what.c1.h3":"現場の部屋で通用するビジョン","what.c1.p":"悪い画角、魚眼の歪み、人の背後を歩く人。そうした条件下での検出、追跡、再同定です。ベンチマーク用の機材ではなく、1基のGPUで95% mAP、25 FPS。","what.c2.idx":"02 · 判断する","what.c2.h3":"根拠を説明できる判断を下すモデル","what.c2.p":"料理を採点し、棚の異常を指摘し、責任者の質問に平易な言葉で答えるビジョン言語モデルとLLMエージェント。ガードレール付きで、答えを鵜呑みにするのではなく議論できるようにします。","what.c3.idx":"03 · 出荷する","what.c3.h3":"地味なほうの半分","what.c3.p":"マイクロサービス、認証、ロールベースのアクセス制御、ロールバック付きのCI/CD、4言語のインターフェース、そして私がいなくてもクライアントが運用できるドキュメント。","plate.img.alt":"営業中のレストランの調理ライン。直火のコンロに鍋が並び、1つはトングで作業中、その奥に提供用の皿が積まれています。","plate.caption":"ソフトウェアが生き抜くべき現場","plate.lede":"ノートブックでは正しく、金曜の12時40分には間違うモデルは、まだ完成していません。以下のシステムはすべて、実際に動く時間帯に合わせて調整しました。遮蔽、蒸気、悪い画角、フレームレートより速く動くスタッフ。","stats.aria":"数字で見る実績","stats.s1":"本番稼働中のシステム","stats.s2":"同じGPU費用での処理性能","stats.s3":"セキュリティレビュー指摘の解消","stats.s4":"ローンチ当日の対応言語数","stats.s5":"単独で納めたクライアントシステム","work.eyebrow":"[ 主な仕事 · フィールドログ ]","work.h2":["本番稼働は12件。","<span class=\"hl\">そのうち4件を<\/span>","<span class=\"hl\">詳しく。<\/span>"],"work.tally":"<b>全部で12件:<\/b> DFloで4件、Viettel Solutionsで1件、Rainscalesで1件、中小企業向けに単独で6件。以下の4件はいずれも、検証できる数字か開けるリポジトリを伴っています。","work.c1.who":"Viettel Solutions · 2023〜25年","work.c1.viz":"図: 商品フェイシングが並ぶ棚3段。1つのフェイシングがビジョンモデルに囲まれ採点されています","work.c1.h3":"TesselAI · 小売棚のスコアリング","work.c1.p":"機会を見つけ、事業計画を書き、そのまま構築してリリースしました。市場の写真を自動で採点し、手作業の巡回監査レビューを不要にするコンピュータビジョンです。","work.c1.out":"TP95で<strong>120<\/strong> RPS · 商用稼働中 · 同一GPUで約3×","work.c1.aria":"TesselAI(小売棚のスコアリング)のリポジトリ閲覧を申請する","work.c2.who":"DFlo · 2025年〜現在","work.c2.viz":"図: 単一のAPIゲートウェイの背後に6つのサービス","work.c2.h3":"Sauron · 飲食店オペレーションAI","work.c2.p":"1つのゲートウェイの背後に6サービス。リアルタイムの卓稼働状況、動線ヒートマップ、食品品質の自動チェック、そして履歴からオペレーションの質問に答えるチャットエージェント。主開発者です。","work.c2.out":"<strong>399<\/strong>コミット · ローンチ時にEN / VI / JA / ZH対応","work.c2.aria":"Sauron(飲食店オペレーションAI)のリポジトリ閲覧を申請する","work.c3.who":"Rainscales · 2025年","work.c3.viz":"図: 魚眼カメラがフロアを捉え、挙手のジェスチャーを検出しています","work.c3.h3":"カジノフロアのインテリジェンス","work.c3.p":"以前の試みが失敗したカメラ設置条件下で、顧客とスタッフの2クラスを検出。加えてジェスチャー認識により、手を挙げた客のもとへフロアスタッフを向かわせます。","work.c3.out":"1基のGPUで約25 FPS、<strong>95%<\/strong> mAP","work.c3.aria":"カジノフロアのインテリジェンスのリポジトリ閲覧を申請する","work.c4.who":"オープンソース","work.c4.viz":"図: 複数GPUの学習パイプラインを通る画像間変換","work.c4.h3":"PyTorch AnimeGANとツール類","work.c4.p":"広く使われている画像生成プロジェクトでの学習安定化と複数GPU対応。加えて言語モデル向けのVRAM計算ツールと、原理から実装したチェスエンジン。","work.c4.out":"PyTorch AnimeGANで<strong>188★<\/strong>のスター","work.c4.aria":"GitHubで開く、PyTorch AnimeGANとツールのソース(新しいタブで開きます)","work.cta.request":"リポジトリ閲覧を申請","work.cta.requestShort":"閲覧を申請","work.cta.open":"GitHubで開く","work.note.nda":"メール · 相互NDA · 2営業日以内に返信","work.note.public":"公開 · 申請不要","also.label":"その他の実績","also.i1.who":"Golden Gate Group · 2025年","also.i1.h3":"KichiKichiのベルト皿カウント","also.i1.p":"ベルトを流れる皿をカテゴリ別に全数カウント。2台のカメラで、ベルト番号のOCRと店長向けのリアルタイムダッシュボード付き。全国チェーンで稼働中です。","also.i1.aria":"閲覧を申請 — KichiKichiのベルト皿カウントのリポジトリ","also.i2.who":"独立 · 2026年","also.i2.h3":"財務分析プラットフォーム","also.i2.p":"雑然としたクライアントのワークブックを構造化テーブルへ突合。システムが提案し、人が確定します。セキュリティレビューの101件の指摘を3回のリリースで解消しました。","also.i2.aria":"閲覧を申請 — 財務分析プラットフォームのリポジトリ","also.i3.who":"独立 · 2026年","also.i3.h3":"多店舗オペレーションプラットフォーム","also.i3.p":"家電修理チェーン全体を1つのシステムに統合し、表計算を置き換えました。店舗単位のデータ分離はアクセストークン内で強制し、21の業務リソースが稼働中です。","also.i3.aria":"閲覧を申請 — 多店舗オペレーションプラットフォームのリポジトリ","band.p":"誰も写真に撮らない部分","band.b":"カメラは安い。<br>答えを説明できることは安くない。","method.eyebrow":"[ 仕事の進め方 ]","method.h2":["モデルを自分に","<span class=\"hl\">同意させる<\/span>のは","誰でもできる。"],"method.lede":"仕事は、監査できるものを作ることです。","method.a.h3":"自動化が提案し、人が承認する","method.a.p":"システムが推論した内容は、人が確認するまで事実として扱いません。","method.b.h3":"黙って失敗しない","method.b.p":"デッドレターキューと診断可能なエラー。評価の失敗は常に可視で、復旧できます。","method.c.h3":"ごまかさないテストゲート","method.c.p":"実データが無いときは合格ではなくスキップする精度チェック。誤った安心は、何も無いより悪いからです。","method.d.h3":"設計段階からのアクセス制御","method.d.p":"分離はトークン内で強制し、応答は最小権限、重要な操作には権限チェックを。","method.e.h3":"戻せるリリース","method.e.p":"自動ロールバック付きの継続的デリバリーと、特定の人に連絡が付くことに依存しないためのランブック。","method.f.h3":"引き継ぎも成果物","method.f.p":"アーキテクチャと運用のドキュメントは、コードの後ではなくコードと並行して書きます。","stack.eyebrow":"[ 使っている技術 ]","stack.h2":["技術スタックを","率直に開示。","<span class=\"hl\">適合をご確認ください。<\/span>"],"stack.lede":"以下はすべて、出荷したシステムの中にあるものです。講座の修了証の上にあるものではありません。","stack.g1.h3":"ビジョンとモデル","stack.g1.items":"YOLO11 · YOLOX · OpenCV · 人物再同定と追跡 · 魚眼キャリブレーション · 深度推定 · PyTorch · TensorFlow · ONNX · Triton","stack.g2.h3":"言語とエージェント","stack.g2.items":"Gemini のビジョン言語モデル · ガードレール付きLLMエージェント(Agno、LangChain)· 検索拡張生成 · 音声認識 · 会話メモリ","stack.g3.h3":"バックエンドとデータ","stack.g3.items":"Python(FastAPI、Celery、Flask)· TypeScript(NestJS、Express)· Go · PostgreSQL · MongoDB · Redis · ベクトルデータベース · PySpark · Pandas · Power BI","stack.g4.h3":"インターフェース","stack.g4.items":"Next.js · React · TypeScript · Tailwind · 多言語配信(EN / VI / JA / ZH)· アクセシビリティ改善 · 自動テスト","stack.g5.h3":"クラウドと運用","stack.g5.items":"Google Cloud · Microsoft Azure(Container Apps、Infrastructure as Code)· Docker · 自動ロールバック付きCI/CD · セルフホストランナー · 安全なリバースプロキシとトンネル接続","track.eyebrow":"[ これまでの経歴 ]","track.aria":"職務経歴","track.r1.when":"2025年7月〜現在","track.r1.h3":"AIエンジニア · DFlo","track.r1.p":"Sauronの主開発者。ほかにGolden Gate向けのベルトコンベア皿カウント、24h+の映像ライブラリを扱う映像インテリジェンス基盤、そしてInfrastructure as CodeでAzureに展開した会議インテリジェンスを納めました。","track.r2.when":"2024年11月〜2026年8月","track.r2.h3":"独立での受託開発 · 範囲確定契約","track.r2.p":"ベトナムの中小企業向けに、本番稼働する業務システム6件を単独で納品。要件定義からセキュリティレビュー、デプロイ、引き継ぎまで、社内にIT部門を持たないクライアントに対して。","track.r3.when":"2025年2月〜6月","track.r3.h3":"AIエンジニア · Rainscales(契約)","track.r3.p":"カジノフロアの検出とジェスチャー認識。加えてLinfox向けに、深度推定から導出した倉庫レイアウトのルール判定。","track.r4.when":"2023年6月〜2025年1月","track.r4.h3":"AIエンジニア · Viettel Solutions","track.r4.p":"TesselAIを社内提案から本番稼働する商用製品へ。加えてハードウェアを変えずに推論スループットを約3×改善しました。","close.eyebrow":"[ ご連絡 ]","close.h2":["カメラと課題が","あるなら、私には","<span class=\"hl\">出荷実績。<\/span>"],"close.lede":"一緒に働く方法は3つあります。フルタイムでの参画、承認ゲートを設けてフェーズ分割で納める範囲確定の受託、または貴社チームに入る技術リード。ハノイ転居またはリモート可。","close.cta.start":"話をはじめる","close.reply":"カメラと課題を教えてください。2営業日以内に返信し、相互NDAの下でプライベートリポジトリをレビュー用に開きます。","close.portrait.caption":"Le Nguyen Thanh Ha · ホーチミン市","close.portrait.alt":"ホーチミン市の屋外で撮影されたLe Nguyen Thanh Ha。","close.said":"本番稼働のシステム12件。うち6件は要件定義から引き継ぎまで一人で、残りはチーム内の主開発者として。<b>ポートフォリオよりリポジトリをお見せしたい。<\/b>言っていただければ開きます。","close.spoken":"ベトナム語(母語)· 英語(実務レベル)。このページを4言語で公開しているのは、製品を4言語で出しているのと同じ理由です。","close.linksLabel":"直接の連絡先","close.copy":"コピー","close.copied":"コピー済み","close.copy.aria":"メールアドレスをコピーする","footer.role":"Le Nguyen Thanh Ha · AIプロダクトエンジニア","footer.verify":"797コミット · レビュー済みプルリクエスト75件 · GitHubで検証 ↗","ticker.pause":"停止","ticker.play":"再生","ticker.pause.aria":"ツールとスキルのスクロール表示を停止する","ticker.play.aria":"ツールとスキルのスクロール表示を再開する","ticker.items":["コンピュータビジョン","YOLO11 + ReID","ビジョン言語による品質管理","マルチカメラ追跡","FastAPI · NestJS","エージェント型分析","Triton · ONNX","自動ロールバック"],"cv.fallback.label":"CVはメールでご請求ください","cv.fallback.meta":"返信でPDFを送付、通常は当日中","guide.s1":"ここから。棚を採点するモデルが読む入力で、枠がその語彙です。要点は随時お伝えします。不要ならいつでも閉じられます。","guide.s2":"私の仕事は3つ、システムが動く順に。見る、判断する、出荷する。形容詞ではなく数字をご覧ください。","guide.s3":"数字は5つ。いずれも検証可能で、その方法はこの下でお見せします。","guide.s4":"ここが根拠です。4件を詳しく—画面が広ければ横スクロールします。各カードの末尾は検証できる数字です。","guide.s5":"仕事の統制方法です。経理や監査が必ず尋ね、多くのAIポートフォリオが省く部分です。","guide.s6":"技術スタックを一覧で明記。特定の技術をお探しなら、検索はこの節でどうぞ。","guide.s7":"どこで、いつ。3年間で4つの職務、新しい順に並べています。","guide.off":"ガイドツアーを終了する","guide.on":"ガイドツアーを再開する","guide.on.label":"?","tag.yolo":"1回の推論でフレーム内のすべての枠を返す物体検出です。ライブ映像に間に合う速さです。","tag.seg":"枠ではなく画素単位の輪郭です。手前のフェイシングと奥のフェイシングを切り分けます。","tag.triton":"NVIDIAの推論サーバーです。GPU上でリクエストをまとめ、1つのモデルで多数の呼び出しに応えます。","tag.onnx":"持ち運べるモデル形式です。1つのフレームワークで学習し、どこでも動かせ、元の実行環境より速いことが多いです。","tag.fastapi":"型付きで自己文書化されるAPIと非同期I/Oのために作られたPythonのWebフレームワークです。","tag.reid":"検出に再同定を加え、柱の裏を通った後も同じ人物に同じIDを付け続けます。","tag.vlm":"ビジョン言語モデルです。画像を見て、その内容についての質問に言葉で答えます。","tag.agno":"エージェントの枠組みです。言語モデルにツールと記憶、そして何を断定してよいかの規則を与えます。","tag.next":"ダッシュボードを支えるReactのフレームワークです。サーバーレンダリング、ルーティング、4言語のビルドを担います。","tag.yolox":"2系統の検出器を、公開データセットではなくクライアント自身の映像で比較評価しました。","tag.fisheye":"天井カメラは直線を歪めます。校正で歪みを戻し、画面上の位置を床の位置として扱えるようにします。","tag.multicam":"3台のカメラに映った1人を、3人ではなく1人として数えます。","tag.pytorch":"このプロジェクトが学習に使うフレームワークで、ビジョン研究の多くもこれで公開されます。","tag.tf":"元の実装が使っていたフレームワークです。この仕事では両方の経路を動く状態で維持しています。","tag.rl":"正解ラベルではなく報酬から学ぶ方法で、チェスエンジンの土台になっています。","metric.c1":"TP95は、リクエストの95%がこれより速く完了したという意味です。平均ではなく、利用者が実際に感じる遅い側を表します。","metric.c2":"このリポジトリで私自身が書いたコミット数です。チーム全体の合計ではありません。","metric.c3":"mAPは平均適合率の平均です。全クラスを通じて検出が正確かつ漏れがないかを、1つの数字で表します。","metric.c4":"この成果が取り込まれた本家オープンソースプロジェクトのスター数です。","work.reel.aria":"主な仕事、4つのシステム","work.reel.prev":"前のプロジェクト","work.reel.next":"次のプロジェクト"}</script>
+<script type="application/json" id="i18n-zh">{"doc.title":"Le Nguyen Thanh Ha — AI 产品工程师","doc.description":"驻胡志明市的 AI 产品工程师。做能在生产环境跑起来的计算机视觉与 LLM 系统：零售货架评分、餐厅运营、赌场场内智能分析。797 次提交、75 个经评审的拉取请求，均可独立核查。","nav.skip":"跳到正文","nav.aria":"主导航","nav.work":"作品","nav.method":"方法","nav.stack":"技术","nav.contact":"联系","nav.lang":"语言","nav.theme.toLight":"切换到浅色主题","nav.theme.toDark":"切换到深色主题","hail.aria":"联系我 — 通过邮件","hail.text":"联系我","hail.short":"邮箱","hero.tagline":"[ LE NGUYEN THANH HA · AI 产品工程师 ]","hero.h1":["我教机器","<span class=\"hl\">观察、判断<\/span>","并汇报结果。"],"hero.thesis":"把摄像头对准一个真实的业务问题，我就能把它变成<b>能把成本赚回来<\/b>的软件：模型、后端、基础设施，以及店长真的会打开的那个界面。","hero.cta.work":"查看作品","hero.cta.cv":"下载简历","hero.dlmeta":"PDF · 270 KB · 更新于 2026 年 9 月","hero.scroll":"滚动","hero.meta.now.k":"现在","hero.meta.now.v":"DFlo AI 工程师，2025 年 7 月至今 · 3 年生产级 AI 交付经验","hero.meta.based.k":"常驻","hero.meta.based.v":"胡志明市 · 可迁往河内或远程","hero.meta.open.k":"可接受","hero.meta.open.v":"全职或固定范围合同 · 可立即到岗","field.eyebrow":"[ 软件看到了什么 ]","field.img.alt":"正面拍摄的超市货道：三层货架陈列着日用品排面，其中一处因售空而留下缺口。","field.svg.alt":"同一货架上叠加了四处检测框：一排六个商品排面、一个单独排面、一个 SKU 区块，以及一处货架售空后的缺口。","field.hud.source":"来源 · CC0 货架照片","field.hud.det":"检测 · <b>4<\/b>","field.hud.classes":"类别 · 货架、排面、缺口","field.hud.overlay":"叠加层 · 手工绘制，非推理结果","field.cap":"这是真实输入，不是它的效果图。货架评分模型把这一帧读成货架层、商品排面和两者之间的缺口，再换算成过去由现场稽核员手工给出的合规分数。上面的框是手工画的，用来说明这套词汇。真正产出这些框的线上系统受客户 NDA 约束，所以下文的示意图讲的是机制，而不是回放画面。","what.eyebrow":"[ 我具体做什么 ]","what.h2":["多数 AI 止步于演示，","我做的系统","能扛过<span class=\"hl\">午市高峰。<\/span>"],"what.c1.idx":"01 · 看见","what.c1.h3":"在真实现场站得住的视觉","what.c1.p":"在糟糕机位、鱼眼畸变和人群相互遮挡的条件下做检测、跟踪和重识别。单块 GPU 上 25 FPS 达到 95% mAP，不是跑分机器。","what.c2.idx":"02 · 判断","what.c2.h3":"结论站得住脚的模型","what.c2.p":"视觉语言模型和带护栏的 LLM 智能体：给一道菜打分、标出有问题的货架，或用日常语言回答店长的提问。这样的答案可以被追问，而不是只能被相信。","what.c3.idx":"03 · 交付","what.c3.h3":"这份工作不光鲜的另一半","what.c3.p":"微服务、认证、基于角色的权限控制、带回滚的 CI/CD、四语言界面，以及我不在场客户也能照着跑起来的文档。","plate.img.alt":"营业中的餐厅炉线：明火灶上架着几只锅，其中一只正被夹子翻动，后面叠着待上的餐盘。","plate.caption":"软件必须扛住的现场","plate.lede":"在 notebook 里正确、周五 12:40 却出错的模型，等于还没做出来。下面每一套系统都是对着它真正运行的那个时段调出来的：遮挡、水汽、糟糕机位，以及动作比帧率还快的员工。","stats.aria":"用数字呈现的履历","stats.s1":"已投产的系统","stats.s2":"同等 GPU 成本下的吞吐","stats.s3":"已关闭的安全审查问题","stats.s4":"上线首日支持的语言","stats.s5":"独立交付的客户系统","work.eyebrow":"[ 精选项目 · 现场记录 ]","work.h2":["十二套系统在线运行。","<span class=\"hl\">其中四套<\/span>","<span class=\"hl\">详细展开。<\/span>"],"work.tally":"<b>一共十二套：<\/b>DFlo 四套、Viettel Solutions 一套、Rainscales 一套，另有六套为中小企业独立交付。下面这四套，每一套都附带一个可核查的数字，或一个可打开的代码仓库。","work.c1.who":"Viettel Solutions · 2023–25","work.c1.viz":"示意图：三层货架上的商品排面，其中一个排面被框出并由视觉模型给出评分","work.c1.h3":"TesselAI · 零售货架评分","work.c1.p":"机会是我发现的，商业方案是我写的，系统也是我建成并发布的：用计算机视觉自动为卖场照片打分，取代人工现场稽核复核。","work.c1.out":"TP95 下 <strong>120<\/strong> RPS · 已投入商用 · 同等 GPU 下约 3×","work.c1.aria":"申请仓库访问 — TesselAI 零售货架评分项目","work.c2.who":"DFlo · 2025 至今","work.c2.viz":"示意图：单个 API 网关背后的六个服务","work.c2.h3":"Sauron · 餐厅运营 AI","work.c2.p":"单一网关背后的六个服务：实时餐桌占用、动线热力图、自动化食品质检，以及一个从历史数据回答运营问题的对话智能体。我是主要作者。","work.c2.out":"<strong>399<\/strong> 次提交 · 上线即支持 EN / VI / JA / ZH","work.c2.aria":"申请仓库访问 — Sauron 餐厅运营 AI 项目","work.c3.who":"Rainscales · 2025","work.c3.viz":"示意图：鱼眼摄像头覆盖的场内区域，其中一个举手手势被识别","work.c3.h3":"赌场场内智能分析","work.c3.p":"在此前方案都失效的机位下，稳定区分顾客与员工两个类别，并加上手势识别，让场内员工被派往举手的客人。","work.c3.out":"单块 GPU 上约 25 FPS，<strong>95%<\/strong> mAP","work.c3.aria":"申请仓库访问 — 赌场场内智能分析项目","work.c4.who":"开源","work.c4.viz":"示意图：在多 GPU 训练流水线上完成的图像到图像转换","work.c4.h3":"PyTorch AnimeGAN 与配套工具","work.c4.p":"为一个被广泛使用的图像生成项目做训练稳定性改进和多 GPU 支持；另有一个面向语言模型负载的显存计算器，以及一个从零实现的国际象棋引擎。","work.c4.out":"PyTorch AnimeGAN 获 <strong>188★<\/strong> 星标","work.c4.aria":"在 GitHub 打开，PyTorch AnimeGAN 与工具的源码（在新标签页中打开）","work.cta.request":"申请仓库访问","work.cta.requestShort":"申请访问","work.cta.open":"在 GitHub 打开","work.note.nda":"邮件 · 双方 NDA · 两个工作日内回复","work.note.public":"公开 · 无需申请","also.label":"其他已交付","also.i1.who":"Golden Gate Group · 2025","also.i1.h3":"KichiKichi 传送带计数","also.i1.p":"每一盘菜在传送带上经过时按品类计数，覆盖两台摄像头，配合传送带编号 OCR 和门店经理的实时看板。已在一家全国连锁餐厅上线运行。","also.i1.aria":"申请访问 KichiKichi 传送带计数项目的代码仓库","also.i2.who":"独立承接 · 2026","also.i2.h3":"财务分析平台","also.i2.p":"把客户杂乱的表格对账成结构化数据表；系统提出结果，由人确认。三个版本中关闭了安全审查提出的 101 个问题。","also.i2.aria":"申请访问财务分析平台项目的代码仓库","also.i3.who":"独立承接 · 2026","also.i3.h3":"多门店运营平台","also.i3.p":"一套系统覆盖整个家电维修连锁，取代原有电子表格。门店级数据隔离在访问令牌内强制执行；21 类业务资源已上线。","also.i3.aria":"申请访问多门店运营平台项目的代码仓库","band.p":"没人会拍下来的那部分","band.b":"摄像头很便宜。<br>能为答案负责并不便宜。","method.eyebrow":"[ 我怎么做事 ]","method.h2":["谁都能让模型","<span class=\"hl\">迎合<\/span>","自己的结论。"],"method.lede":"真正的工作，是做出能被审计的东西。","method.a.h3":"自动化提出建议，由人确认","method.a.p":"系统推断出的任何结果，在有人确认之前都不当作事实。","method.b.h3":"不容许静默失败","method.b.p":"死信队列和可诊断的错误。失败的评估始终可见、可恢复。","method.c.h3":"诚实的测试门禁","method.c.p":"缺少真实验证数据时，准确率检查会跳过，而不是判为通过。虚假的把握比没有把握更糟。","method.d.h3":"权限控制内建于设计","method.d.p":"隔离在令牌中强制执行，响应遵循最小权限，关键操作逐一设权限。","method.e.h3":"可回退的发布","method.e.p":"持续交付配自动回滚，并配有运行手册，任何环节都不依赖某一个人随时在线。","method.f.h3":"交接本身就是交付物","method.f.p":"架构文档与运维文档和代码同步写成，而不是事后补。","stack.eyebrow":"[ 我用什么构建 ]","stack.h2":["技术栈如实列出，","方便你直接","<span class=\"hl\">核对匹配度。<\/span>"],"stack.lede":"下面每一项都用在已上线的系统里，而不是写在课程证书上。","stack.g1.h3":"视觉与模型","stack.g1.items":"YOLO11 · YOLOX · OpenCV · 行人重识别与跟踪 · 鱼眼标定 · 深度估计 · PyTorch · TensorFlow · ONNX · Triton","stack.g2.h3":"语言与智能体","stack.g2.items":"Gemini 视觉语言模型 · 带护栏的 LLM 智能体（Agno、LangChain） · 检索增强生成 · 语音识别 · 对话记忆","stack.g3.h3":"后端与数据","stack.g3.items":"Python（FastAPI、Celery、Flask） · TypeScript（NestJS、Express） · Go · PostgreSQL · MongoDB · Redis · 向量数据库 · PySpark · Pandas · Power BI","stack.g4.h3":"界面","stack.g4.items":"Next.js · React · TypeScript · Tailwind · 多语言交付（EN / VI / JA / ZH） · 无障碍整改 · 自动化测试","stack.g5.h3":"云与运维","stack.g5.items":"Google Cloud · Microsoft Azure（Container Apps、基础设施即代码） · Docker · 带自动回滚的 CI/CD · 自托管 runner · 安全反向代理与隧道访问","track.eyebrow":"[ 履历记录 ]","track.aria":"工作经历","track.r1.when":"2025 年 7 月至今","track.r1.h3":"AI 工程师 · DFlo","track.r1.p":"Sauron 的主要作者。还为 Golden Gate 交付了传送带菜品计数、一个处理 24h+ 视频库的视频智能平台，以及用基础设施即代码部署到 Azure 的会议智能系统。","track.r2.when":"2024 年 11 月 – 2026 年 8 月","track.r2.h3":"独立交付 · 固定范围合同","track.r2.p":"为越南中小企业独立交付六套生产级业务系统：从需求、安全审查到部署与交接，客户均无内部 IT 团队。","track.r3.when":"2025 年 2 月 – 6 月","track.r3.h3":"AI 工程师 · Rainscales（合同制）","track.r3.p":"赌场场内检测与手势识别；基于深度估计为 Linfox 推导仓库布局规则。","track.r4.when":"2023 年 6 月 – 2025 年 1 月","track.r4.h3":"AI 工程师 · Viettel Solutions","track.r4.p":"把 TesselAI 从内部提案做成投入生产的商用产品，并在硬件不变的前提下把推理吞吐提升约 3×。","close.eyebrow":"[ 取得联系 ]","close.h2":["你有摄像头","和一个问题，","我有<span class=\"hl\">交付记录。<\/span>"],"close.lede":"三种合作方式：全职岗位；按阶段交付、设验收节点的固定范围项目合同；或作为技术负责人嵌入你自己的团队。可迁往河内或远程。","close.cta.start":"开始沟通","close.reply":"告诉我摄像头和问题。我会在两个工作日内回复；在双方 NDA 下，私有仓库可开放给你审阅。","close.portrait.caption":"Le Nguyen Thanh Ha · 胡志明市","close.portrait.alt":"Le Nguyen Thanh Ha 在胡志明市户外拍摄的照片。","close.said":"十二套生产系统，其中六套从需求到交接由我独立完成，其余由我在团队中作为主要作者完成。<b>我更愿意给你看代码仓库，而不是作品集。<\/b>开口就好，我会打开一个。","close.spoken":"越南语（母语） · 英语（专业工作水平）。这个页面用四种语言发布，理由和产品一样。","close.linksLabel":"或者直接联系我","close.copy":"复制","close.copied":"已复制","close.copy.aria":"复制邮箱地址","footer.role":"Le Nguyen Thanh Ha · AI 产品工程师","footer.verify":"797 次提交 · 75 个经评审的拉取请求 · 在 GitHub 上核查 ↗","ticker.pause":"暂停","ticker.play":"播放","ticker.pause.aria":"暂停工具与技能的滚动列表","ticker.play.aria":"继续播放工具与技能的滚动列表","ticker.items":["计算机视觉","YOLO11 + ReID","视觉语言质检","多摄像头跟踪","FastAPI · NestJS","智能体分析","Triton · ONNX","自动回滚"],"cv.fallback.label":"发邮件索取简历","cv.fallback.meta":"PDF 由回信附上，通常当天发出","guide.s1":"从这里开始。这是货架模型读取的输入，框就是它的词汇表。往下我会标出关键处；随时可以关掉我。","guide.s2":"我做三件事，顺序和系统一样：看见、判断、交付。看数字，别看形容词。","guide.s3":"五个数字。每一个都可核查，再往下我会告诉你怎么查。","guide.s4":"证据在这里。四套系统详细展开——宽屏下这组卡片横向滚动。每张卡都以一个可核查的数字收尾。","guide.s5":"工作如何被治理。这是财务或审计团队会问的部分，也是多数 AI 作品集跳过的部分。","guide.s6":"技术栈，如实列成清单。在找某一项具体技术？就搜这一节。","guide.s7":"地点与时间：三年里的四段任职，最近的排在最前。","guide.off":"关闭引导导览","guide.on":"重新开启引导导览","guide.on.label":"?","tag.yolo":"单次前向就完成的目标检测器：看一帧画面即返回其中所有的框，快到能跟上实时视频。","tag.seg":"给出像素级轮廓而不是方框——这才分得清前排商品和它后面那一排。","tag.triton":"NVIDIA 的推理服务器。它在 GPU 上把请求合成批次，让一个模型同时服务许多调用方。","tag.onnx":"一种可移植的模型格式：在一个框架里训练，换到哪里都能跑，通常还比原生运行时更快。","tag.fastapi":"一个 Python Web 框架，为带类型标注、自带接口文档的 API 和异步 I/O 而生。","tag.reid":"检测加行人重识别：同一个人从柱子后面走出来，身上的 ID 还是原来那个。","tag.vlm":"视觉语言模型。它看一张图，然后用文字回答关于这张图的问题。","tag.agno":"一个智能体框架：给语言模型配上工具、记忆，以及关于它能断言什么的规则。","tag.next":"看板背后的 React 框架——负责服务端渲染、路由，以及四语言构建。","tag.yolox":"两个检测器家族，在客户自己的录像上相互对比，而不是在公开数据集上。","tag.fisheye":"吊顶摄像头会把直线拍弯。标定消除这种畸变，让画面上的位置对应地面上的位置。","tag.multicam":"被三台摄像头同时看到的一个人，只计一次，不是三次。","tag.pytorch":"本项目用来训练的框架，也是多数视觉研究发布代码时用的那个。","tag.tf":"原始实现所用的框架；这项工作让两条路径都继续可用。","tag.rl":"从奖励里学，而不是从标好的答案里学——国际象棋引擎用的就是这个方法。","metric.c1":"TP95 表示 95% 的请求都比这个时间更快。它说的是慢尾部，也就是用户真正感受到的部分，而不是平均值。","metric.c2":"这个仓库里由我本人提交的次数，不是整个团队的总数。","metric.c3":"mAP 是平均精度均值：用一个数字衡量检测器在每个类别上既判得准、又不漏检的程度。","metric.c4":"这项工作被合入的那个上游开源项目所获得的星标数。","work.reel.aria":"精选项目，四套系统","work.reel.prev":"上一个项目","work.reel.next":"下一个项目"}</script>
 <script>
 /* ══ i18n ════════════════════════════════════════════════════════════════
    Four locales over one document. Loaded before GSAP on purpose: the ticker,
@@ -2375,15 +2465,20 @@ footer a{display:inline-flex; align-items:center; min-height:24px}
 </script>
 <script>
 /* ══ reel: navigation and explanation ════════════════════════════════════
-   Standalone so it survives GSAP not loading. Two jobs:
+   Standalone, and deliberately outside the GSAP block: everything here has
+   to work with prefers-reduced-motion on and with gsap.min.js missing. Under
+   the old pinned scrub it did not, and card 04 was unreachable in both
+   cases. Three jobs:
 
-   1. Build the stepper. The pinned rail is driven by scrollY, so "go to card
-      4" is a scroll position, not a DOM scroll — the pinned branch below
-      publishes the mapping as window.__reelSeek and this calls it. Without
-      GSAP there is no pin and the cards are a plain wrapped grid, so the
-      fallback is an ordinary scrollIntoView.
+   1. Lay the rail out — centre the row when the four cards fit, pad it so
+      the end cards can still reach the middle when they do not.
 
-   2. Surface the explanation a tag or a figure already carries as .sr-only
+   2. Drive and report position from one number, rail.scrollLeft: the
+      stepper, the arrows, the progress fill, the card turn, drag, the wheel
+      and the scrollbar all read and write that single value, so no two
+      controls can disagree about which card you are on.
+
+   3. Surface the explanation a tag or a figure already carries as .sr-only
       text, in the card's overlay slot, for readers who are not using a
       screen reader. */
 (function(){
@@ -2398,24 +2493,117 @@ footer a{display:inline-flex; align-items:center; min-height:24px}
     return h ? h.textContent.replace(/\s+/g, ' ').trim() : String(i + 1);
   }
 
+  var fill  = document.getElementById('reelFill');
+  var prevB = document.getElementById('reelPrev');
+  var nextB = document.getElementById('reelNext');
+  var reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ── geometry ─────────────────────────────────────────────────────────
+     Padding exists so the first and last card can still reach the middle of
+     the rail; without it scroll-snap-align:center defines snap positions the
+     scroll range cannot actually reach. But it is only correct when the row
+     overflows. On a 4K display four cards and three gaps come to 1,816px
+     inside 3,840 — adding 1,700px of padding either side would manufacture
+     scrolling for content that already fits. So: centre when it fits, pad
+     when it does not. */
+  function layout(){
+    var card = slabs[0].getBoundingClientRect().width;
+    var gap  = parseFloat(getComputedStyle(rail).columnGap) || 24;
+    var content = slabs.length * card + (slabs.length - 1) * gap;
+    var avail = rail.clientWidth;
+    /* -60, not a hairline tolerance: at 1920 the four cards cleared the
+       viewport by 9px and counted as fitting, which put them hard against
+       both edges. The row gets the same 30px gutter the rail's own padding
+       would have given it. */
+    var fits = content <= avail - 60;
+    rail.classList.toggle('fits', fits);
+    rail.style.paddingInline = fits ? '' : Math.max(16, Math.round((avail - card) / 2)) + 'px';
+    mark();
+  }
+
+  /* Which card is nearest the centre of the rail's viewport. Derived from
+     scrollLeft, which is the same number the scrollbar, the arrows, the
+     stepper, drag and the keyboard all move — so every control and the
+     readout cannot disagree. The previous implementation read
+     getBoundingClientRect() inside a GSAP onUpdate that fired while a 0.8s
+     scrub was still catching up, and never re-ran once scrolling stopped:
+     measured wrong at 4 of 7 rest positions, including both ends. */
+  function nearest(){
+    var mid = rail.scrollLeft + rail.clientWidth / 2, best = 0, bd = Infinity;
+    for(var i = 0; i < slabs.length; i++){
+      var c = slabs[i].offsetLeft + slabs[i].offsetWidth / 2;
+      var d = Math.abs(c - mid);
+      if(d < bd){ bd = d; best = i; }
+    }
+    return best;
+  }
+
+  var shown = -1;
+  function mark(){
+    var max = rail.scrollWidth - rail.clientWidth;
+    var p = max > 1 ? rail.scrollLeft / max : 0;
+    if(fill) fill.style.width = (p * 100).toFixed(1) + '%';
+    if(prevB) prevB.disabled = rail.scrollLeft <= 1;
+    if(nextB) nextB.disabled = rail.scrollLeft >= max - 1;
+    /* Each card turns according to how far it sits from the centre, so the
+       row reads as physical panels rather than a strip sliding sideways.
+       Same --pass contract the stylesheet already composes with the pointer
+       tilt; only its driver changed from page scrollY to rail scrollLeft. */
+    var mid = rail.clientWidth / 2;
+    for(var i = 0; i < slabs.length; i++){
+      var rel = (slabs[i].offsetLeft + slabs[i].offsetWidth / 2 - rail.scrollLeft - mid) / mid;
+      var c = Math.max(-1.4, Math.min(1.4, rel));
+      slabs[i].style.setProperty('--pass', (c * -11).toFixed(2));
+      slabs[i].style.setProperty('--lift', (-Math.abs(c) * 30).toFixed(1));
+      slabs[i].style.zIndex = String(50 - Math.round(Math.abs(c) * 20));
+    }
+    var n = nearest();
+    if(n !== shown){
+      shown = n;
+      for(var k = 0; k < btns.length; k++){
+        if(k === n) btns[k].setAttribute('aria-current', 'true');
+        else btns[k].removeAttribute('aria-current');
+      }
+    }
+  }
+
+  function go(i){
+    i = Math.max(0, Math.min(slabs.length - 1, i));
+    var s = slabs[i];
+    var left = s.offsetLeft + s.offsetWidth / 2 - rail.clientWidth / 2;
+    /* 'instant', not 'auto'. ScrollToOptions treats 'auto' as "whatever CSS
+       scroll-behavior says", and the rail's says smooth — so the reduced-motion
+       branch was still animating. Measured: a scrollTo(0,'auto') was still at
+       1402px after 100ms and only reached 0 at ~900ms. */
+    rail.scrollTo({left: left, behavior: reduce ? 'instant' : 'smooth'});
+  }
+
+  /* WCAG 2.5.3 Label in Name. The accessible name must START with the text
+     the reader can see, or a voice-control user who says "click oh-one" —
+     the only label this button shows — activates nothing. It used to be the
+     card heading alone. The heading still follows it, and is already
+     translated, so the stepper localises with no keys of its own. */
+  function nameOf(i){ return ('0' + (i + 1)).slice(-2) + ': ' + titleOf(i); }
+
   slabs.forEach(function(slab, i){
     var b = document.createElement('button');
     b.type = 'button';
     b.className = 'st';
     b.textContent = ('0' + (i + 1)).slice(-2);
-    /* The accessible name is the card's own heading, which is already
-       translated — so the stepper localises with no keys of its own. */
-    b.setAttribute('aria-label', titleOf(i));
-    b.addEventListener('click', function(){
-      if(typeof window.__reelSeek === 'function') window.__reelSeek(i);
-      else slab.scrollIntoView({block:'center'});
-    });
+    b.setAttribute('aria-label', nameOf(i));
+    b.addEventListener('click', function(){ go(i); });
     steps.appendChild(b);
   });
   var btns = Array.prototype.slice.call(steps.children);
   addEventListener('langchange', function(){
-    btns.forEach(function(b, i){ b.setAttribute('aria-label', titleOf(i)); });
+    btns.forEach(function(b, i){ b.setAttribute('aria-label', nameOf(i)); });
+    /* A locale change re-wraps every card, so the geometry the padding and
+       the snap positions were computed from no longer holds. */
+    requestAnimationFrame(layout);
   });
+
+  if(prevB) prevB.addEventListener('click', function(){ go(nearest() - 1); });
+  if(nextB) nextB.addEventListener('click', function(){ go(nearest() + 1); });
 
   /* Arrow keys across the stepper. All four stay in the tab order — a nav of
      four is not worth a roving index — but Left/Right walk them without
@@ -2434,13 +2622,70 @@ footer a{display:inline-flex; align-items:center; min-height:24px}
     btns[n].click();
   });
 
-  window.__reelMark = function(i){
-    btns.forEach(function(b, n){
-      if(n === i) b.setAttribute('aria-current', 'true');
-      else b.removeAttribute('aria-current');
-    });
-  };
-  window.__reelMark(0);
+  /* ── drag to pan ──────────────────────────────────────────────────────
+     Grab the rail and pull. Measured before this existed: a 600px click-drag
+     moved the rail 0px and selected the card's body copy instead.
+
+     Pointer Events rather than mouse events, so a stylus and a mouse take
+     the same path while touch keeps the platform's own inertial scrolling —
+     which is better than anything reimplemented here. The 4px threshold is
+     what keeps a click on a card's link a click: below it nothing is
+     captured and the link fires normally. */
+  var drag = null;
+  rail.addEventListener('pointerdown', function(e){
+    if(e.pointerType === 'touch' || e.button !== 0) return;
+    if(e.target.closest('a, button, select, input, [tabindex]:not([tabindex="-1"])')) return;
+    drag = {x: e.clientX, left: rail.scrollLeft, moved: false, id: e.pointerId};
+  });
+  rail.addEventListener('pointermove', function(e){
+    if(!drag || e.pointerId !== drag.id) return;
+    var dx = e.clientX - drag.x;
+    if(!drag.moved){
+      if(Math.abs(dx) < 4) return;
+      drag.moved = true;
+      rail.classList.add('dragging');
+      rail.setPointerCapture(drag.id);
+    }
+    rail.scrollLeft = drag.left - dx;
+  });
+  function endDrag(e){
+    if(!drag || (e && e.pointerId !== drag.id)) return;
+    if(drag.moved){
+      if(rail.hasPointerCapture(drag.id)) rail.releasePointerCapture(drag.id);
+      rail.classList.remove('dragging');
+      /* Snap was off during the drag so the rail could sit wherever the hand
+         left it; settle it onto the nearest card now the hand is gone. */
+      go(nearest());
+    }
+    drag = null;
+  }
+  rail.addEventListener('pointerup', endDrag);
+  rail.addEventListener('pointercancel', endDrag);
+
+  /* A vertical wheel over a horizontal strip is the one gesture a mouse with
+     no horizontal axis can offer, and the browser spends it on the page.
+     Translate it — but only while the rail still has somewhere to go, so the
+     page never feels stuck at either end. deltaX is left alone: the browser
+     already routes a trackpad's horizontal axis here correctly. */
+  rail.addEventListener('wheel', function(e){
+    if(rail.classList.contains('fits')) return;
+    if(Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+    var max = rail.scrollWidth - rail.clientWidth;
+    var next = rail.scrollLeft + e.deltaY;
+    if((e.deltaY < 0 && rail.scrollLeft <= 0) || (e.deltaY > 0 && rail.scrollLeft >= max - 1)) return;
+    e.preventDefault();
+    rail.scrollLeft = Math.max(0, Math.min(max, next));
+  }, {passive: false});
+
+  var panTimer = null;
+  rail.addEventListener('scroll', function(){
+    requestAnimationFrame(mark);
+    rail.classList.add('panning');
+    clearTimeout(panTimer);
+    panTimer = setTimeout(function(){ rail.classList.remove('panning'); }, 120);
+  }, {passive: true});
+  addEventListener('resize', layout);
+  layout();
 
   /* ── explanations ─────────────────────────────────────────────────────
      The source of truth is the .sr-only sentence inside the tag or figure,
@@ -2550,13 +2795,29 @@ footer a{display:inline-flex; align-items:center; min-height:24px}
 
 <script>
 /* Copy-to-clipboard for the address; independent of GSAP so it works even if
-   the CDN is blocked. */
+   the CDN is blocked.
+
+   The button swapped its visible text to "Copied" and nothing else. The
+   accessible name stayed "Copy email address" and the page had no live
+   region at all, so a screen-reader user pressed the button and received no
+   confirmation whatsoever — the one piece of feedback the control exists to
+   give. A polite status region announces it without moving focus. */
 (function(){
   var b = document.querySelector('.copy'); if(!b || !navigator.clipboard) return;
+  var say = document.createElement('p');
+  say.className = 'sr-only';
+  say.setAttribute('role', 'status');
+  say.setAttribute('aria-live', 'polite');
+  b.parentNode.insertBefore(say, b.nextSibling);
   b.addEventListener('click', function(){
     navigator.clipboard.writeText(b.dataset.copy).then(function(){
       var t = window.I18N && window.I18N.t;
-      b.textContent = t ? t('close.copied') : 'Copied'; b.classList.add('done');
+      var done = t ? t('close.copied') : 'Copied';
+      b.textContent = done; b.classList.add('done');
+      /* Cleared first: re-announcing identical text is a no-op in most
+         screen readers, so a second copy would be silent. */
+      say.textContent = '';
+      setTimeout(function(){ say.textContent = done; }, 60);
       setTimeout(function(){
         b.textContent = t ? t('close.copy') : 'Copy'; b.classList.remove('done');
       }, 2000);
@@ -2947,168 +3208,14 @@ footer a{display:inline-flex; align-items:center; min-height:24px}
     addEventListener('langchange', paint);
   })();
 
-  var rail = document.getElementById('rail');
-  /* These two keys mirror the CSS media queries exactly. The height gate is the
-     point: a pinned rail on a short viewport clips the card it is showing. */
-  ScrollTrigger.matchMedia({
-    '(min-width: 1001px) and (min-height: 840px)': function(){
-      var slabs = Array.prototype.slice.call(rail.querySelectorAll('.slab'));
-      var fill = document.getElementById('reelFill');
-      var shown = -1;
-
-      /* Half a viewport minus half a card at each end, so every card can
-         reach the middle of the screen. Without it the rail stopped with its
-         right edge 60px inside the viewport, which meant the last card was
-         never the one nearest the centre — face() could not return index 3,
-         the old "01 / 04" readout could never show 04, and clicking the last
-         step landed on the one before it. Re-applied on refresh because the
-         card width is a clamp() of the viewport. */
-      var railPad = 30;
-      function pad(){
-        var w = slabs[0] ? slabs[0].offsetWidth : 0;
-        railPad = Math.max(30, Math.round((innerWidth - w) / 2));
-        rail.style.paddingLeft = rail.style.paddingRight = railPad + 'px';
-      }
-      pad();
-      /* Measured from the last card, not from rail.scrollWidth: on a flex row
-         the trailing padding is not counted in scrollWidth, so the travel came
-         out half a viewport short and the rail stopped before the last card
-         could reach the middle — the scrub only ever reached cards 0–2. */
-      var dist = function(){
-        pad();
-        var last = slabs[slabs.length - 1];
-        if(!last) return 0;
-        return Math.max(0, last.offsetLeft + last.offsetWidth + railPad - innerWidth);
-      };
-
-      /* Each card turns according to how far its centre sits from the centre of
-         the viewport, so the rail reads as a carousel of physical panels rather
-         than a strip sliding sideways. Written as a number into --pass; the
-         transform that consumes it is in the stylesheet, alongside the pointer
-         tilt, so the two compose instead of overwriting each other. */
-      function face(){
-        var mid = innerWidth / 2, near = 0, nearD = Infinity;
-        for(var i=0;i<slabs.length;i++){
-          var r = slabs[i].getBoundingClientRect();
-          var d = (r.left + r.width/2 - mid) / mid;          /* -1 .. 1 */
-          var c = Math.max(-1.4, Math.min(1.4, d));
-          slabs[i].style.setProperty('--pass', (c * -11).toFixed(2));
-          slabs[i].style.setProperty('--lift', (-Math.abs(c) * 30).toFixed(1));
-          /* .rail sets perspective but not preserve-3d, so siblings paint in DOM
-             order and translateZ does not sort them: the furthest card was drawn
-             over the nearest one and clipped its body copy mid-word. Sort by
-             distance from centre instead. */
-          slabs[i].style.zIndex = String(50 - Math.round(Math.abs(c) * 20));
-          if(Math.abs(d) < nearD){ nearD = Math.abs(d); near = i; }
-        }
-        return near;
-      }
-      function progress(st){
-        var pct = Math.max(0, Math.min(1, st.progress));
-        if(fill) fill.style.width = (pct * 100).toFixed(1) + '%';
-        var i = face();
-        /* The centred card changed: mark the stepper and let the schematic
-           re-acquire. One short glitch on the card arriving, never on the
-           four that are merely passing. */
-        if(i !== shown){
-          shown = i;
-          if(window.__reelMark) window.__reelMark(i);
-          if(!reduce){
-            var v = slabs[i];
-            v.classList.remove('glitch');
-            void v.offsetWidth;
-            v.classList.add('glitch');
-            setTimeout(function(){ v.classList.remove('glitch'); }, 600);
-          }
-        }
-      }
-
-      var tween = gsap.to(rail, {x:function(){ return -dist(); }, ease:'none',
-        scrollTrigger:{trigger:'#reel', start:'top top',
-          end:function(){ return '+=' + dist(); },
-          pin:true, scrub:.8, invalidateOnRefresh:true, anticipatePin:1,
-          onUpdate:progress,
-          /* The half-second ease on .slab is right for a hover and wrong for a
-             value changing every frame, where it lands as lag behind the scroll. */
-          onToggle:function(st){ rail.classList.toggle('scrubbing', st.isActive); }}});
-      face();
-
-      /* The scroll offset that puts card i in the middle of the screen.
-
-         The obvious mapping — i/(n-1) across the scrub — is wrong, and
-         measurably: the scrub ends with the rail's right edge 60px inside the
-         viewport, so the last card sits right-aligned, not centred, and
-         clicking 04 landed on 03. Solve for the rail offset that centres the
-         card instead, then convert that offset to a scroll position. Clamped,
-         so the first and last cards go as far as the rail allows. */
-      function scrollForCard(i){
-        var st = tween.scrollTrigger;
-        if(!st) return null;
-        var d = dist();
-        if(d <= 0) return st.start;
-        var s = slabs[i];
-        /* offsetLeft is inside .rail and unaffected by the rail's transform,
-           which is what makes this stable mid-scrub. */
-        var want = innerWidth / 2 - (s.offsetLeft + s.offsetWidth / 2);
-        var p = Math.max(0, Math.min(1, -want / d));
-        return st.start + p * (st.end - st.start);
-      }
-      /* Tweened through a plain object and written with scrollTo(), because
-         ScrollToPlugin is not one of the two GSAP files this page loads. */
-      window.__reelSeek = function(i){
-        var y = scrollForCard(i);
-        if(y === null) return;
-        var o = {y: scrollY};
-        gsap.to(o, {y:y, duration:.55, ease:'power2.inOut', overwrite:true,
-          onUpdate:function(){ scrollTo(0, o.y); }});
-      };
-
-      /* Anchored to #work, not #reel: #reel is the pinned element, so its start
-         is recomputed on every refresh and a from() hanging off it re-asserts
-         opacity:0 each time — the cards stayed invisible for the whole pin. The
-         same trap the .tl-row comment below describes. once:true kills the
-         trigger after it fires so no later refresh can reach back into it. */
-      gsap.from('.slab', {y:60, opacity:0, duration:.7, stagger:.06, ease:'power3.out',
-        /* Hand the cards back to the stylesheet on arrival, or the inline
-           transform GSAP leaves behind outranks the composed 3D rule. */
-        clearProps:'transform,opacity',
-        scrollTrigger:{trigger:'#work', start:'top 55%', once:true}});
-
-      /* While pinned, the browser cannot scroll a focused card into view: horizontal
-         position is driven by scrollY, so tabbing left seven links off-screen with no
-         visible ring. Translate focus into the scroll position that centres it. */
-      function focusIntoView(e){
-        var st = tween.scrollTrigger;
-        if(!st) return;
-        var slab = e.target.closest && e.target.closest('.slab');
-        if(!slab) return;
-        var slabs = Array.prototype.slice.call(rail.querySelectorAll('.slab'));
-        var i = slabs.indexOf(slab);
-        if(i < 0 || slabs.length < 2) return;
-        /* Same geometry as the stepper, so a tabbed card and a clicked step
-           land in the same place. */
-        var y = scrollForCard(i);
-        if(y !== null) st.scroll(y);
-      }
-      rail.addEventListener('focusin', focusIntoView);
-      /* Resizing out of the pinned branch must take the seek with it, or the
-         stepper keeps scrolling to offsets that no longer mean anything. */
-      return function(){
-        rail.removeEventListener('focusin', focusIntoView);
-        window.__reelSeek = null;
-        /* Inline padding would outrank the wrapped grid's padding-inline:0. */
-        rail.style.paddingLeft = rail.style.paddingRight = '';
-      };
-    },
-    '(max-width: 1000px), (max-height: 839px)': function(){
-      gsap.utils.toArray('.slab').forEach(function(s){
-        /* A resize out of the pinned branch leaves the last face() values inline;
-           wrapped cards then sit turned and lifted. Hand them back to the sheet. */
-        s.style.removeProperty('--pass'); s.style.removeProperty('--lift'); s.style.zIndex = '';
-        gsap.from(s, {y:36, opacity:0, duration:.7, ease:'power3.out',
-          scrollTrigger:{trigger:s, start:'top 88%'}});
-      });
-    }
+  /* The reel is a native scroller now and owns its own position, its own
+     controls and its own --pass turn, all outside this GSAP block so they
+     survive prefers-reduced-motion and a failed CDN. What is left here is
+     the one thing GSAP is actually for: the cards arriving. */
+  gsap.utils.toArray('.slab').forEach(function(s){
+    gsap.from(s, {y:36, opacity:0, duration:.7, ease:'power3.out',
+      clearProps:'transform,opacity',
+      scrollTrigger:{trigger:'#work', start:'top 72%', once:true}});
   });
 
   /* Anchor navigation. The pin mutates document height as it resolves, so a native
