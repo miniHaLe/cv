@@ -1187,11 +1187,33 @@ footer a:hover{color:var(--accent); border-color:var(--accent)}
      Method and Stack are one scroll away; the theme already follows the OS
      setting, and losing the toggle costs a preference, not access; the
      language does not follow anything a recruiter forwarding a link controls,
-     so it is the control that stays. The pill keeps its mark and its
-     accessible name and drops the word. */
+     so it is the control that stays.
+
+     The pill used to drop its word here too, leaving a 32px red disc marked
+     HA — which reads as a profile picture, not as a button, on the one
+     viewport where the dock has already dropped Work/Method/Stack and this
+     is the only route to contact. The aria-label was correct, so it failed
+     precisely the sighted reader scanning for a way to reply. The word stays
+     and the duplicate HA mark goes instead: the dock two inches away is
+     already showing it. */
   .dock a[href="#method"],.dock a[href="#stack"],.dock button.icon{display:none}
-  .hail .txt-short{display:none}
-  .hail{padding:9px 10px; gap:0}
+  .hail .av{display:none}
+  /* Carrying a word makes the pill 78px instead of 52px, and at 320 that
+     overlapped the dock's Contact link and language select — axe target-size,
+     "partially obscured", 59.6x18.3. Floating it to the bottom-right instead
+     traded one collision for a worse one: measured at 390 it sat over the
+     reel's own "04" step, and unlike the dock that bar moves, so no fixed
+     offset clears it.
+
+     The space comes from the dock instead. Two HA marks were on screen at
+     once — the dock's signature and the pill's avatar — and the pill is the
+     one that has to say what it does. The signature is the one that can go:
+     a monogram naming the person whose page this obviously is was the least
+     load-bearing pixel in the row. min-height because the avatar was what
+     gave the pill its height; without it the box fell to 39px, under the
+     44px floor this page holds itself to below 980px. */
+  .dock .sig{display:none}
+  .hail{padding:9px 16px; gap:0; min-height:44px}
   .wrap{padding:0 22px}
   .rail{gap:18px}
   .hero{padding:106px 0 76px}
@@ -1311,6 +1333,18 @@ footer a:hover{color:var(--accent); border-color:var(--accent)}
 .det-hud.on{opacity:1; visibility:visible; transform:none; pointer-events:none;
   transition:opacity .4s var(--ease-out), transform .4s var(--ease-out),
              visibility 0s linear, border-radius .3s var(--ease-out)}
+/* Clicks passing through was never the whole problem: the panel still SAT on
+   the copy underneath it. Measured, it covered four lines of the field caption
+   and almost all of "~3× throughput on the same GPU spend" — the first number
+   on a page whose thesis is that every claim carries one.
+
+   So it gets out of the way. An instrument that occludes the reading is a
+   badly placed instrument, and the cheapest correct behaviour is to yield to
+   the reader rather than to argue with them about z-order. Opacity only: no
+   layout, no reflow, and it survives the reduced-motion allowlist because a
+   fade is not vestibular motion. */
+.det-hud.yield{opacity:.08}
+.det-hud.yield .ctl-x{pointer-events:none}
 .det-hud .top{display:flex; align-items:center; gap:12px}
 .det-hud .rd{flex:1; min-width:0; overflow:hidden}
 
@@ -1474,6 +1508,30 @@ footer a{display:inline-flex; align-items:center; min-height:24px}
 :root:lang(ja) .band .over b,:root:lang(zh) .band .over b{line-height:1.3;
   letter-spacing:0; text-transform:none; font-size:clamp(22px,3.6vw,46px)}
 :root:lang(ja) .stats b,:root:lang(zh) .stats b{letter-spacing:-.02em}
+
+/* ══ wide displays ═══════════════════════════════════════════════════════
+   The h1 hits its 104px ceiling at about a 1300px viewport and then stops,
+   so on a 34" ultrawide the loudest thing on the page renders across a third
+   of the screen with a thousand pixels of empty gutter either side. The
+   headline is the page's whole opening argument; it should not go quiet on
+   the biggest display a CTO owns.
+
+   The ceiling is raised, not removed, and it is set from measurement rather
+   than taste. h1 .ln is overflow:hidden with breaks authored per locale, so
+   a line that outgrows its box is clipped silently — the exact hazard The
+   Two Unit Rule exists for. Measured ink against the 1220px column at the
+   current size, the largest each locale can take is EN 191px, ZH 201px,
+   VI 172px and JA 152px. 140/118 keeps at least 19% margin in the tightest
+   of them, in a locale nobody on this team reads.
+
+   Gated on height too: three lines at 140px is 378px of headline. Measured
+   at 1600x900 that pushed "See the work" below the fold in Vietnamese —
+   the longest locale — so the gate is 960px, which clears 1080p and every
+   larger display while leaving a 900px-tall window on the old ceiling. */
+@media (min-width:1600px) and (min-height:960px){
+  h1{font-size:min(9.6vw, 140px)}
+  :root:lang(ja) h1,:root:lang(zh) h1{font-size:min(8.2vw, 118px)}
+}
 /* Uppercase does nothing to a CJK glyph and .13em–.24em tracking pulls a run
    of them apart into loose beads; the embedded Latin keeps its own case. */
 :root:lang(ja) .tagline,:root:lang(zh) .tagline,
@@ -2199,6 +2257,29 @@ footer a{display:inline-flex; align-items:center; min-height:24px}
   var hero  = document.querySelector('.hero');
   var closeEl = document.getElementById('contact');
   var reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ── yield to the reader ──────────────────────────────────────────────
+     The panel is fixed bottom-left over live body copy. Clicks already pass
+     through it; what they could not pass through was the reading. When the
+     pointer comes within 40px of its box it fades almost out, and comes back
+     when the pointer leaves. Pointer position is compared against a cached
+     rect and the class is only touched on a change, so a mousemove costs one
+     comparison and no layout read. */
+  (function yieldToReader(){
+    if(!matchMedia('(pointer:fine)').matches) return;
+    var box = null, near = false, pad = 40;
+    function measure(){ box = hud.getBoundingClientRect(); }
+    addEventListener('resize', function(){ box = null; }, {passive:true});
+    addEventListener('scroll', function(){ box = null; }, {passive:true});
+    addEventListener('mousemove', function(e){
+      if(!box || !box.width) measure();
+      var n = e.clientX >= box.left - pad && e.clientX <= box.right + pad &&
+              e.clientY >= box.top  - pad && e.clientY <= box.bottom + pad;
+      if(n === near) return;
+      near = n;
+      hud.classList.toggle('yield', n);
+    }, {passive:true});
+  })();
 
   /* The tour is on by default and off for good once dismissed. A reader who
      wants the page, not the tour, should need exactly one click — and should
