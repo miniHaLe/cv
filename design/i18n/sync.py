@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Mirror design/i18n/{vi,ja,zh}.json into landing.html, checking parity first.
+"""Mirror design/i18n/{vi,ja,zh}.json into index.html, checking parity first.
 
 There is deliberately no en.json. English is the authored markup, and the
 runtime reads it out of the DOM at boot, so the contract a translation has to
-satisfy is the set of data-i18n* keys in landing.html plus the handful of keys
+satisfy is the set of data-i18n* keys in index.html plus the handful of keys
 owned by the scripts. Both are extracted here rather than duplicated.
 
     python3 design/i18n/sync.py            # check and mirror
@@ -17,7 +17,7 @@ import re
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-PAGE = ROOT / "landing.html"
+PAGE = ROOT / "index.html"
 LOCALES = ("vi", "ja", "zh")
 
 # Values that are an array in every dictionary, and how many entries they must
@@ -124,10 +124,10 @@ def main() -> int:
 
     out = mirror(html, dicts)
     if out == html:
-        print("landing.html already matches the dictionaries")
+        print("index.html already matches the dictionaries")
     else:
         PAGE.write_text(out, encoding="utf-8")
-        print("landing.html inline dictionaries updated")
+        print("index.html inline dictionaries updated")
     return 0
 
 

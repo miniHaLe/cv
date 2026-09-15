@@ -60,8 +60,13 @@ document.documentElement.classList.add('js');
 <meta property="og:description" content="I teach machines to watch, judge, and report. Computer vision and LLM systems that survive a lunch rush, not just a demo.">
 <meta property="og:url" content="https://minihale.github.io/cv/">
 <!-- Absolute so the card resolves when shared from any path.
-     Deployed as a subfolder of the miniHaLe.github.io Pages repo; the root there
-     stays the phongthanh-admin redirect. -->
+     Deployed from the miniHaLe/cv project repo, which serves /cv/ directly;
+     this file is its index.html, which is why the canonical above is a bare
+     directory URL. It previously lived as a cv/ subfolder of the
+     miniHaLe.github.io Pages repo — that folder has been removed, because a
+     project repo outranks it and a second copy at the same path could
+     silently resurface as a stale build. The root of the Pages repo is
+     untouched and still redirects to phongthanh-admin. -->
 <meta property="og:image" content="https://minihale.github.io/cv/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Le Nguyen Thanh Ha — AI product engineer">
